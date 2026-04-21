@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="../Sayiad.Data/Sayiad.Data.csproj" />
+  <Project Path="../Sayiad.Domain/Sayiad.Domain.csproj" />
+  <Project Path="Sayiad.Api.csproj">
+    <BuildType Project="Debug" />
+  </Project>
+</Solution>
