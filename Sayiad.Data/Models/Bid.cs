@@ -1,6 +1,4 @@
-﻿using System.Net.NetworkInformation;
-
-namespace Sayiad.Api.Models
+﻿namespace Sayiad.Data.Models
 {
     public class Bid
     {

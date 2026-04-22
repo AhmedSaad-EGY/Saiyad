@@ -1,10 +1,7 @@
 ﻿global using System;
 global using System.Collections.Generic;
-global using System.Text;
-global using Sayiad.Api.Enums;
+global using Sayiad.Data.Enums;
 global using Microsoft.EntityFrameworkCore;
-global using Sayiad.Api.Data.Configurations;
-global using Sayiad.Api.Models;
+global using Sayiad.Data.Models;
 global using Microsoft.EntityFrameworkCore.Metadata.Builders;
-global using Sayiad.Api.Data;
-global using Sayiad.Data.Reposatory.MainRepo;
+global using Sayiad.Data.Data;

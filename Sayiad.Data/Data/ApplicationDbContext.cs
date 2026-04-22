@@ -1,4 +1,4 @@
-﻿namespace Marketplace.Data
+﻿namespace Sayiad.Data.Data
 {
     public class ApplicationDbContext : DbContext
     {

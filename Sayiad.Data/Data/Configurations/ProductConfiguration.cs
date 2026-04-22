@@ -1,4 +1,4 @@
-﻿namespace Sayiad.Api.Data.Configurations
+﻿namespace Sayiad.Data.Data.Configurations
 {
     public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {

@@ -1,4 +1,4 @@
-﻿namespace Sayiad.Api.Enums
+﻿namespace Sayiad.Data.Enums
 {
     public enum AuctionStatus
     {
