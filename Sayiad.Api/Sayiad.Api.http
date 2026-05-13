@@ -1,6 +1,0 @@
-@Sayiad.Api_HostAddress = http://localhost:5002
-
-GET {{Sayiad.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
