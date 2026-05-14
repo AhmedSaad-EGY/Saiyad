@@ -47,7 +47,7 @@ public class AuthManager : IAuthManager
 
         await _userRepo.AddAsync(user);
 
-        var verifyUrl = $"https://sayiad.runasp.net/api/auth/verify-email?token={user.EmailVerificationToken}";
+        var verifyUrl = $"https://sayiad.vercel.app/#/verify-email?token={user.EmailVerificationToken}";
         await _emailService.SendAsync(
             user.Email,
             "Verify your Sayiad account",

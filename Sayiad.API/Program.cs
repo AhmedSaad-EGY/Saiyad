@@ -48,6 +48,7 @@ try
                 .WithOrigins(
                     "http://localhost:3000",
                     "http://localhost:5173",
+                    "http://localhost:8000",
                     "https://sayiad.vercel.app"
                 )
                 .AllowAnyHeader()
@@ -113,11 +114,11 @@ try
     app.UseSerilogRequestLogging();
     app.UseMiddleware<Sayiad.Api.Middleware.ExceptionMiddleware>();
 
-    if (app.Environment.IsDevelopment())
-    {
+    //if (app.Environment.IsDevelopment())
+    //{
         app.UseSwagger();
         app.UseSwaggerUI();
-    }
+    //}
 
     app.UseStaticFiles();
     app.UseHttpsRedirection();
