@@ -34,6 +34,8 @@ public class AuctionExpiryService : BackgroundService
         try
         {
             using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider
+                .GetRequiredService<ApplicationDbContext>();
             var auctionRepo = scope.ServiceProvider
                 .GetRequiredService<IAuctionRepository>();
             var unitOfWork = scope.ServiceProvider
@@ -42,6 +44,20 @@ public class AuctionExpiryService : BackgroundService
                 .GetRequiredService<INotificationManager>();
             var emailService = scope.ServiceProvider
                 .GetRequiredService<IEmailService>();
+
+            // Activate scheduled auctions whose start time has arrived
+            var toActivate = await db.Auctions
+                .Where(a => a.Status == AuctionStatus.Scheduled && a.StartTime <= DateTime.UtcNow)
+                .ToListAsync();
+
+            foreach (var auction in toActivate)
+            {
+                auction.Status = AuctionStatus.Active;
+                _logger.LogInformation("Auction {AuctionId} activated (scheduled start time reached)", auction.Id);
+            }
+
+            if (toActivate.Any())
+                await db.SaveChangesAsync();
 
             var expiredAuctions = await auctionRepo.GetExpiredActiveAsync();
 

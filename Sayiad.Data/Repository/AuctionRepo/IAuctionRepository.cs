@@ -11,4 +11,12 @@ public interface IAuctionRepository
     Task AddAsync(Auction auction);
     Task<List<Auction>> GetExpiredActiveAsync();
     Task<int> GetUserMonthlyAuctionCountAsync(int userId);
+
+    // Auction request system
+    Task<AuctionRequest> CreateRequestAsync(AuctionRequest request);
+    Task<AuctionRequest?> GetRequestByIdAsync(int id);
+    Task<PagedResult<AuctionRequest>> GetPendingRequestsAsync(PaginationRequest pagination);
+    Task<PagedResult<AuctionRequest>> GetFishermanRequestsAsync(int fishermanId, PaginationRequest pagination);
+    Task<AuctionRequest> UpdateRequestAsync(AuctionRequest request);
+    Task<List<Auction>> GetByCreatorAsync(int userId);
 }

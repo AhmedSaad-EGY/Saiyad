@@ -6,7 +6,7 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Fisherman,BaitSeller,Auctioneer")]
+[Authorize]
 public class UploadController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;

@@ -4,8 +4,15 @@ namespace Sayiad.Domain.Dtos.AuctionDtos;
 /// <summary>Full auction details returned to clients.</summary>
 public record AuctionResponse(int Id, int ProductId, string ProductTitle, string? ProductImageUrl, int? WinnerUserId, string? WinnerName, DateTime StartTime, DateTime EndTime, decimal StartingPrice, decimal ReservePrice, decimal MinimumIncrement, decimal CurrentHighestBid, AuctionStatus Status, int BidCount, DateTime CreatedAt);
 
-/// <summary>Request to create a new auction for a product.</summary>
-public record CreateAuctionRequest(int ProductId, DateTime EndTime, decimal StartingPrice, decimal ReservePrice, decimal MinimumIncrement);
+/// <summary>Request to create a new auction for a product. StartTime is optional — null means start immediately.</summary>
+public record CreateAuctionRequest(
+    int ProductId,
+    DateTime EndTime,
+    decimal StartingPrice,
+    decimal ReservePrice,
+    decimal MinimumIncrement,
+    DateTime? StartTime = null
+);
 
 /// <summary>Request to place a bid. Set MaxAutoBidAmount to enable automatic bidding up to that amount.</summary>
 public record PlaceBidRequest(decimal Amount, decimal? MaxAutoBidAmount = null);

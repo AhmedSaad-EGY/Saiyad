@@ -3,5 +3,6 @@ namespace Sayiad.Data.Models;
     {
         Active,
         Finished,
-        Cancelled
+        Cancelled,
+        Scheduled
     }

@@ -89,4 +89,74 @@ public class AuctionRepository : IAuctionRepository
             .Include(a => a.Winner)
             .ToListAsync();
     }
+
+    public async Task<AuctionRequest> CreateRequestAsync(AuctionRequest request)
+    {
+        await _db.AuctionRequests.AddAsync(request);
+        await _db.SaveChangesAsync();
+        return request;
+    }
+
+    public async Task<AuctionRequest?> GetRequestByIdAsync(int id)
+        => await _db.AuctionRequests
+            .Include(r => r.Fisherman)
+            .Include(r => r.ReviewedByAuctioneer)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+    public async Task<PagedResult<AuctionRequest>> GetPendingRequestsAsync(PaginationRequest pagination)
+    {
+        var query = _db.AuctionRequests
+            .Include(r => r.Fisherman)
+            .Where(r => r.Status == AuctionRequestStatus.Pending)
+            .OrderByDescending(r => r.CreatedAt);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<AuctionRequest>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
+
+    public async Task<PagedResult<AuctionRequest>> GetFishermanRequestsAsync(int fishermanId, PaginationRequest pagination)
+    {
+        var query = _db.AuctionRequests
+            .Where(r => r.FishermanId == fishermanId)
+            .OrderByDescending(r => r.CreatedAt);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<AuctionRequest>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
+
+    public async Task<AuctionRequest> UpdateRequestAsync(AuctionRequest request)
+    {
+        request.UpdatedAt = DateTime.UtcNow;
+        _db.AuctionRequests.Update(request);
+        await _db.SaveChangesAsync();
+        return request;
+    }
+
+    public async Task<List<Auction>> GetByCreatorAsync(int userId)
+        => await _db.Auctions
+            .Include(a => a.Bids)
+            .Where(a => a.CreatedByUserId == userId)
+            .ToListAsync();
 }

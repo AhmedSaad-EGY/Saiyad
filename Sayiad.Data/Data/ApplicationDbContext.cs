@@ -24,11 +24,31 @@
         public DbSet<Report> Reports { get; set; } = null!;
         public DbSet<SellerProfile> SellerProfiles { get; set; } = null!;
         public DbSet<Subscription> Subscriptions { get; set; } = null!;
+        public DbSet<AuctionRequest> AuctionRequests { get; set; } = null!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+            modelBuilder.ApplyConfiguration(new AuctionRequestConfiguration());
+
+            // Fix decimal precision warnings
+            modelBuilder.Entity<Bid>(b =>
+            {
+                b.Property(x => x.Amount).HasPrecision(18, 2);
+                b.Property(x => x.MaxAutoBidAmount).HasPrecision(18, 2);
+            });
+            modelBuilder.Entity<OrderItem>(o =>
+            {
+                o.Property(x => x.UnitPrice).HasPrecision(18, 2);
+                o.Property(x => x.Subtotal).HasPrecision(18, 2);
+            });
+            modelBuilder.Entity<Payment>(p =>
+                p.Property(x => x.Amount).HasPrecision(18, 2));
+            modelBuilder.Entity<SellerProfile>(s =>
+                s.Property(x => x.AverageRating).HasPrecision(3, 2));
+            modelBuilder.Entity<Transaction>(t =>
+                t.Property(x => x.Amount).HasPrecision(18, 2));
         }
     }
 }
