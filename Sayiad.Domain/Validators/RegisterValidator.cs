@@ -8,7 +8,10 @@ public class RegisterValidator : AbstractValidator<RegisterRequest>
     public RegisterValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().MinimumLength(2).MaximumLength(100);
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty().WithMessage("Email is required.")
+            .EmailAddress().WithMessage("Email must be a valid email address.")
+            .MaximumLength(256).WithMessage("Email must not exceed 256 characters.");
         RuleFor(x => x.Password)
             .NotEmpty().MinimumLength(8)
             .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter")

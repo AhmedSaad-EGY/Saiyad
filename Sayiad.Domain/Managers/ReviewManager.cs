@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Data.Data;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Dtos.ReviewDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -9,14 +11,16 @@ public class ReviewManager : IReviewManager
     private readonly IProductRepository _productRepo;
     private readonly ISellerProfileRepository _sellerProfileRepo;
     private readonly INotificationManager _notificationManager;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ReviewManager> _logger;
 
-    public ReviewManager(IReviewRepository reviewRepo, IProductRepository productRepo, ISellerProfileRepository sellerProfileRepo, INotificationManager notificationManager, ILogger<ReviewManager> logger)
+    public ReviewManager(IReviewRepository reviewRepo, IProductRepository productRepo, ISellerProfileRepository sellerProfileRepo, INotificationManager notificationManager, IUnitOfWork unitOfWork, ILogger<ReviewManager> logger)
     {
         _reviewRepo = reviewRepo;
         _productRepo = productRepo;
         _sellerProfileRepo = sellerProfileRepo;
         _notificationManager = notificationManager;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -53,11 +57,14 @@ public class ReviewManager : IReviewManager
             ProductId = request.ProductId,
             UserId = userId,
             Rating = request.Rating,
-            Comment = request.Comment,
+            Comment = InputSanitizer.SanitizeNullable(request.Comment),
             CreatedAt = DateTime.UtcNow
         };
 
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
         await _reviewRepo.AddAsync(review);
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation("Review created: Product {ProductId}, User {UserId}, Rating {Rating}",
             request.ProductId, userId, request.Rating);

@@ -13,15 +13,14 @@ public class AuctionRepository : IAuctionRepository
     public async Task<PagedResult<Auction>> GetActiveAsync(AuctionFilterRequest filter, PaginationRequest pagination)
     {
         var query = _db.Auctions
-            .Include(a => a.Product).ThenInclude(p => p.Images)
+            .Include(a => a.Product!).ThenInclude(p => p.Images)
             .Include(a => a.Bids)
-            .Where(a => a.Status == AuctionStatus.Active);
+            .Where(a => a.Status == AuctionStatus.Active && a.Product != null);
 
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
             query = query.Where(a =>
-                a.Product != null && (
-                    a.Product.Title.Contains(filter.SearchTerm) ||
-                    a.Product.Description.Contains(filter.SearchTerm)));
+                a.Product!.Title.Contains(filter.SearchTerm) ||
+                a.Product!.Description.Contains(filter.SearchTerm));
         if (filter.MinPrice.HasValue)
             query = query.Where(a => a.CurrentHighestBid >= filter.MinPrice);
         if (filter.MaxPrice.HasValue)
@@ -59,7 +58,7 @@ public class AuctionRepository : IAuctionRepository
     public async Task<Auction?> GetByIdWithDetailsAsync(int auctionId)
     {
         return await _db.Auctions
-            .Include(a => a.Product).ThenInclude(p => p.Images)
+            .Include(a => a.Product!).ThenInclude(p => p.Images)
             .Include(a => a.Bids).ThenInclude(b => b.User)
             .Include(a => a.Winner)
             .FirstOrDefaultAsync(a => a.Id == auctionId);
@@ -71,9 +70,13 @@ public class AuctionRepository : IAuctionRepository
         await _db.SaveChangesAsync();
     }
 
-    public async Task<int> SaveChangesAsync()
+    public async Task<int> GetUserMonthlyAuctionCountAsync(int userId)
     {
-        return await _db.SaveChangesAsync();
+        var now = DateTime.UtcNow;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        return await _db.Auctions
+            .CountAsync(a => a.CreatedByUserId == userId && a.CreatedAt >= startOfMonth);
     }
 
     public async Task<List<Auction>> GetExpiredActiveAsync()

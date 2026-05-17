@@ -1,3 +1,4 @@
+using Sayiad.Data.Data;
 using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Managers;
 
@@ -35,6 +36,8 @@ public class AuctionExpiryService : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var auctionRepo = scope.ServiceProvider
                 .GetRequiredService<IAuctionRepository>();
+            var unitOfWork = scope.ServiceProvider
+                .GetRequiredService<IUnitOfWork>();
             var notificationManager = scope.ServiceProvider
                 .GetRequiredService<INotificationManager>();
             var emailService = scope.ServiceProvider
@@ -59,7 +62,7 @@ public class AuctionExpiryService : BackgroundService
                             auction.Product.Status = ProductStatus.Sold;
                     }
 
-                    await auctionRepo.SaveChangesAsync();
+                    await unitOfWork.SaveChangesAsync();
 
                     if (auction.WinnerUserId.HasValue)
                     {

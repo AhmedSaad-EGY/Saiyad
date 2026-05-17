@@ -23,6 +23,7 @@
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<Report> Reports { get; set; } = null!;
         public DbSet<SellerProfile> SellerProfiles { get; set; } = null!;
+        public DbSet<Subscription> Subscriptions { get; set; } = null!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

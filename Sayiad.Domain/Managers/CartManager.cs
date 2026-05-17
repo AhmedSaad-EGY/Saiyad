@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Data.Data;
 using Sayiad.Domain.Dtos.CartDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -7,12 +8,14 @@ public class CartManager : ICartManager
 {
     private readonly ICartRepository _cartRepo;
     private readonly IProductRepository _productRepo;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CartManager> _logger;
 
-    public CartManager(ICartRepository cartRepo, IProductRepository productRepo, ILogger<CartManager> logger)
+    public CartManager(ICartRepository cartRepo, IProductRepository productRepo, IUnitOfWork unitOfWork, ILogger<CartManager> logger)
     {
         _cartRepo = cartRepo;
         _productRepo = productRepo;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -48,7 +51,7 @@ public class CartManager : ICartManager
             });
         }
 
-        await _cartRepo.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         _logger.LogInformation("Item added to cart: User {UserId}, Product {ProductId}", userId, request.ProductId);
 
         return await GetCartAsync(userId);
@@ -75,7 +78,7 @@ public class CartManager : ICartManager
             item.Quantity = request.Quantity;
         }
 
-        await _cartRepo.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return await GetCartAsync(userId);
     }
 
@@ -88,7 +91,7 @@ public class CartManager : ICartManager
             if (item != null)
             {
                 cart.CartItems.Remove(item);
-                await _cartRepo.SaveChangesAsync();
+                await _unitOfWork.SaveChangesAsync();
             }
         }
     }
@@ -99,7 +102,7 @@ public class CartManager : ICartManager
         if (cart != null)
         {
             cart.CartItems.Clear();
-            await _cartRepo.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 

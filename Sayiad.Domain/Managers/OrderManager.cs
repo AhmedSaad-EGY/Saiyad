@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Sayiad.Data.Common;
+using Sayiad.Data.Data;
 using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Dtos.OrderDtos;
 
@@ -8,28 +9,34 @@ namespace Sayiad.Domain.Managers;
 public class OrderManager : IOrderManager
 {
     private readonly IOrderRepository _orderRepo;
+    private readonly IProductRepository _productRepo;
     private readonly ICartRepository _cartRepo;
     private readonly IUserRepository _userRepo;
     private readonly ISellerProfileRepository _sellerProfileRepo;
     private readonly INotificationManager _notificationManager;
     private readonly IEmailService _emailService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<OrderManager> _logger;
 
     public OrderManager(
         IOrderRepository orderRepo,
+        IProductRepository productRepo,
         ICartRepository cartRepo,
         IUserRepository userRepo,
         ISellerProfileRepository sellerProfileRepo,
         INotificationManager notificationManager,
         IEmailService emailService,
+        IUnitOfWork unitOfWork,
         ILogger<OrderManager> logger)
     {
         _orderRepo = orderRepo;
+        _productRepo = productRepo;
         _cartRepo = cartRepo;
         _userRepo = userRepo;
         _sellerProfileRepo = sellerProfileRepo;
         _notificationManager = notificationManager;
         _emailService = emailService;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -43,11 +50,17 @@ public class OrderManager : IOrderManager
 
         _ = await GetShippingAddressAsync(userId, request.ShippingAddressId);
 
+        var productCache = new Dictionary<int, Product>();
         foreach (var item in cart.CartItems)
         {
-            if (item.Product.StockQuantity < item.Quantity)
+            var product = await _productRepo.GetByIdAsync(item.ProductId)
+                ?? throw new KeyNotFoundException($"Product #{item.ProductId} not found");
+
+            if (product.StockQuantity < item.Quantity)
                 throw new InvalidOperationException(
                     $"Insufficient stock for {item.Product.Title}");
+
+            productCache[item.ProductId] = product;
         }
 
         var order = new CustomerOrder
@@ -61,21 +74,34 @@ public class OrderManager : IOrderManager
 
         foreach (var cartItem in cart.CartItems)
         {
-            var subtotal = cartItem.Product.Price * cartItem.Quantity;
+            var product = productCache[cartItem.ProductId];
+            var subtotal = product.Price * cartItem.Quantity;
             order.TotalPrice += subtotal;
 
             order.OrderItems.Add(new OrderItem
             {
                 ProductId = cartItem.ProductId,
-                SellerId = cartItem.Product.SellerId,
+                SellerId = product.SellerId,
                 Quantity = cartItem.Quantity,
-                UnitPrice = cartItem.Product.Price,
+                UnitPrice = product.Price,
                 Subtotal = subtotal,
                 CreatedAt = DateTime.UtcNow
             });
         }
 
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+
         order = await _orderRepo.CreateOrderTransactionAsync(order, userId);
+
+        foreach (var cartItem in cart.CartItems)
+        {
+            var product = productCache[cartItem.ProductId];
+            product.StockQuantity -= cartItem.Quantity;
+            await _productRepo.UpdateAsync(product);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         await _notificationManager.CreateAsync(userId, "Order Placed",
             $"Your order #{order.Id} has been placed successfully.");

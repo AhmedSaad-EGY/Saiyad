@@ -34,8 +34,8 @@ public class ExceptionMiddleware : IMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
-            await WriteErrorResponse(context, HttpStatusCode.InternalServerError, "An unexpected error occurred");
+            _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            await WriteErrorResponse(context, HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 

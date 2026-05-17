@@ -13,6 +13,9 @@ namespace Sayiad.Data.Models;
         public string? EmailVerificationToken { get; set; }
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiry { get; set; }
+        public string? PasswordResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
+        public SubscriptionTier SubscriptionTier { get; set; } = SubscriptionTier.Free;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
@@ -29,4 +32,5 @@ namespace Sayiad.Data.Models;
         public SellerProfile? SellerProfile { get; set; }
         public ICollection<Auction> WonAuctions { get; set; } = new List<Auction>();
         public ICollection<OrderItem> SoldOrderItems { get; set; } = new List<OrderItem>();
+        public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
     }

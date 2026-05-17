@@ -9,9 +9,10 @@ public class CreateProductValidator : AbstractValidator<CreateProductRequest>
     {
         RuleFor(x => x.Title).NotEmpty().MinimumLength(3).MaximumLength(200);
         RuleFor(x => x.Description).NotEmpty().MaximumLength(2000);
+        RuleFor(x => x.Brand).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Price).GreaterThan(0);
         RuleFor(x => x.StockQuantity).GreaterThanOrEqualTo(0);
         RuleFor(x => x.CategoryId).GreaterThan(0);
-        RuleFor(x => x.Location).NotEmpty();
+        RuleFor(x => x.Location).NotEmpty().MaximumLength(100);
     }
 }

@@ -17,9 +17,7 @@ public class ProductRepository : IProductRepository
     public async Task<PagedResult<Product>> GetAllAsync(ProductFilterRequest filter, PaginationRequest pagination)
     {
         var query = _db.Products
-            .Include(p => p.Seller)
             .Include(p => p.Category)
-            .Include(p => p.Images)
             .Where(p => p.DeletedAt == null && p.Status != ProductStatus.Draft)
             .AsQueryable();
 
@@ -58,18 +56,14 @@ public class ProductRepository : IProductRepository
     public async Task<Product?> GetByIdAsync(int id)
     {
         return await _db.Products
-            .Include(p => p.Seller)
             .Include(p => p.Category)
-            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null);
     }
 
     public async Task<IEnumerable<Product>> GetSellerProductsAsync(int sellerId)
     {
         return await _db.Products
-            .Include(p => p.Seller)
             .Include(p => p.Category)
-            .Include(p => p.Images)
             .Where(p => p.SellerId == sellerId && p.DeletedAt == null)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
@@ -94,6 +88,13 @@ public class ProductRepository : IProductRepository
 
     public async Task<ProductImage> AddImageAsync(ProductImage image)
     {
+        if (image.IsPrimary)
+        {
+            await _db.ProductImages
+                .Where(i => i.ProductId == image.ProductId && i.IsPrimary)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.IsPrimary, false));
+        }
+
         await _db.ProductImages.AddAsync(image);
         await _db.SaveChangesAsync();
         return image;

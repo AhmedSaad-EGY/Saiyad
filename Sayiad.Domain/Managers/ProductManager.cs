@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Sayiad.Data.Common;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Dtos.ProductDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -50,13 +51,13 @@ public class ProductManager : IProductManager
         {
             SellerId = sellerId,
             CategoryId = request.CategoryId,
-            Title = request.Title,
-            Description = request.Description,
-            Brand = request.Brand,
+            Title = InputSanitizer.Sanitize(request.Title),
+            Description = InputSanitizer.Sanitize(request.Description),
+            Brand = InputSanitizer.SanitizeNullable(request.Brand),
             Condition = request.Condition,
             Price = request.Price,
             StockQuantity = request.StockQuantity,
-            Location = request.Location,
+            Location = InputSanitizer.SanitizeNullable(request.Location),
             Status = ProductStatus.Available,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -76,13 +77,13 @@ public class ProductManager : IProductManager
         if (product.SellerId != sellerId)
             throw new UnauthorizedAccessException("You can only edit your own products");
 
-        product.Title = request.Title;
-        product.Description = request.Description;
-        product.Brand = request.Brand;
+        product.Title = InputSanitizer.Sanitize(request.Title);
+        product.Description = InputSanitizer.Sanitize(request.Description);
+        product.Brand = InputSanitizer.SanitizeNullable(request.Brand);
         product.Condition = request.Condition;
         product.Price = request.Price;
         product.StockQuantity = request.StockQuantity;
-        product.Location = request.Location;
+        product.Location = InputSanitizer.SanitizeNullable(request.Location);
         product.CategoryId = request.CategoryId;
         product.Status = request.Status;
         product.UpdatedAt = DateTime.UtcNow;
@@ -114,12 +115,6 @@ public class ProductManager : IProductManager
 
         if (product.SellerId != sellerId)
             throw new UnauthorizedAccessException("You can only add images to your own products");
-
-        if (request.IsPrimary)
-        {
-            foreach (var existing in product.Images.Where(i => i.IsPrimary))
-                existing.IsPrimary = false;
-        }
 
         var image = new ProductImage
         {
@@ -159,9 +154,10 @@ public class ProductManager : IProductManager
     private static ProductResponse MapToResponse(Product p) => new(
         p.Id, p.Title, p.Description, p.Brand, p.Condition,
         p.Price, p.StockQuantity, p.Location, p.IsAuctioned,
-        p.Status, p.SellerId, p.Seller.FullName,
+        p.Auctions?.FirstOrDefault(a => a.Status == AuctionStatus.Active)?.Id,
+        p.Status, p.SellerId, p.Seller?.FullName ?? string.Empty,
         p.CategoryId, p.Category.Name,
-        p.Images.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
+        p.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
         p.CreatedAt, p.UpdatedAt
     );
 }

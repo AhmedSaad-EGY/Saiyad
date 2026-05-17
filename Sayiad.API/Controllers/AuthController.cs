@@ -6,6 +6,10 @@ using Sayiad.Domain.Dtos.AuthDtos;
 
 namespace Sayiad.Api.Controllers;
 
+/// <summary>
+/// Handles user authentication: register, login, token refresh, logout,
+/// email verification, password reset (forgot + reset), and password change.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
@@ -54,6 +58,26 @@ public class AuthController : ControllerBase
     {
         await _authManager.VerifyEmailAsync(token);
         return Ok(new { message = "Email verified successfully. You can now log in." });
+    }
+
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        var result = await _authManager.ForgotPasswordAsync(request);
+        return Ok(new { message = "If that email is registered, a reset code has been sent." });
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+    {
+        var result = await _authManager.ResetPasswordAsync(request);
+
+        if (!result.IsSuccess)
+            return BadRequest(new { message = result.Error });
+
+        return Ok(new { message = "Password reset successful." });
     }
 
     [Authorize]

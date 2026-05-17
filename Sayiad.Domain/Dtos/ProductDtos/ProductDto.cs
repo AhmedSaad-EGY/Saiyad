@@ -4,7 +4,7 @@ namespace Sayiad.Domain.Dtos.ProductDtos;
 public record ProductResponse(
     int Id, string Title, string Description, string Brand,
     ProductCondition Condition, decimal Price, int StockQuantity,
-    string Location, bool IsAuctioned, ProductStatus Status,
+    string Location, bool IsAuctioned, int? AuctionId, ProductStatus Status,
     int SellerId, string SellerName, int CategoryId, string CategoryName,
     string? PrimaryImageUrl, DateTime CreatedAt, DateTime UpdatedAt
 );

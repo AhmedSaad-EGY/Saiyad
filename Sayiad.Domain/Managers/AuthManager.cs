@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Dtos.AuthDtos;
 
@@ -33,21 +34,22 @@ public class AuthManager : IAuthManager
 
         var user = new User
         {
-            FullName = request.FullName,
+            FullName = InputSanitizer.Sanitize(request.FullName),
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Phone = request.Phone,
             Role = Enum.Parse<UserRole>(request.Role),
             IsActive = true,
             IsEmailVerified = false,
-            EmailVerificationToken = Guid.NewGuid().ToString("N"),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
+        var rawVerificationToken = Guid.NewGuid().ToString("N");
+        user.EmailVerificationToken = HashToken(rawVerificationToken);
         await _userRepo.AddAsync(user);
 
-        var verifyUrl = $"https://sayiad.vercel.app/#/verify-email?token={user.EmailVerificationToken}";
+        var verifyUrl = $"https://sayiad.vercel.app/#/verify-email?token={rawVerificationToken}";
         await _emailService.SendAsync(
             user.Email,
             "Verify your Sayiad account",
@@ -81,7 +83,7 @@ public class AuthManager : IAuthManager
 
     public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
     {
-        var user = await _userRepo.GetByRefreshTokenAsync(refreshToken)
+        var user = await _userRepo.GetByRefreshTokenAsync(HashToken(refreshToken))
             ?? throw new UnauthorizedAccessException("Invalid or expired refresh token");
 
         _logger.LogInformation("Token refreshed for user: {Email}", user.Email);
@@ -102,7 +104,7 @@ public class AuthManager : IAuthManager
 
     public async Task VerifyEmailAsync(string token)
     {
-        var user = await _userRepo.GetByVerificationTokenAsync(token)
+        var user = await _userRepo.GetByVerificationTokenAsync(HashToken(token))
             ?? throw new KeyNotFoundException("Invalid or expired verification token.");
 
         user.IsEmailVerified = true;
@@ -111,6 +113,69 @@ public class AuthManager : IAuthManager
         await _userRepo.UpdateAsync(user);
 
         _logger.LogInformation("Email verified for user: {UserId}", user.Id);
+    }
+
+    public async Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        var user = await _userRepo.GetByEmailAsync(request.Email);
+
+        // Always return success to avoid leaking user existence
+        if (user is null)
+        {
+            _logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
+            return Result.Success();
+        }
+
+        var otp = Random.Shared.Next(100000, 999999).ToString();
+        user.PasswordResetToken = BCrypt.Net.BCrypt.HashPassword(otp);
+        user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(15);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepo.UpdateAsync(user);
+
+        await _emailService.SendAsync(
+            user.Email,
+            "Reset your Sayiad password",
+            $@"<p>Hello {user.FullName},</p>
+               <p>Your password reset code is:</p>
+               <p style='font-size:24px;font-weight:bold;letter-spacing:4px;'>{otp}</p>
+               <p>This code expires in 15 minutes.</p>
+               <p>If you did not request a password reset, ignore this email.</p>");
+
+        _logger.LogInformation("Password reset OTP sent to: {Email}", request.Email);
+        return Result.Success();
+    }
+
+    public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        var user = await _userRepo.GetByEmailAsync(request.Email);
+
+        if (user is null)
+            return Result.Failure("Invalid reset attempt.");
+
+        if (user.PasswordResetToken is null || user.PasswordResetTokenExpiry is null)
+            return Result.Failure("No password reset was requested.");
+
+        if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            return Result.Failure("Reset code has expired. Please request a new one.");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Token, user.PasswordResetToken))
+            return Result.Failure("Invalid reset code.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiry = null;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepo.UpdateAsync(user);
+
+        await _emailService.SendAsync(
+            user.Email,
+            "Your Sayiad password was reset",
+            $@"<p>Hello {user.FullName},</p>
+               <p>Your password has been reset successfully.</p>
+               <p>If you did not make this change, contact support immediately.</p>");
+
+        _logger.LogInformation("Password reset completed for: {Email}", request.Email);
+        return Result.Success();
     }
 
     public async Task ChangePasswordAsync(int userId, string currentPassword, string newPassword)
@@ -140,7 +205,7 @@ public class AuthManager : IAuthManager
         var (token, expiry) = _tokenService.GenerateJwtToken(user);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
-        user.RefreshToken = refreshToken;
+        user.RefreshToken = HashToken(refreshToken);
         user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
         await _userRepo.UpdateAsync(user);
 
@@ -161,4 +226,11 @@ public class AuthManager : IAuthManager
         user.Role.ToString(),
         user.IsActive
     );
+
+    private static string HashToken(string token)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
 }

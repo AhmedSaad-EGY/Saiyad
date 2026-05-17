@@ -18,11 +18,19 @@ public class WishlistController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetWishlist()
+    public async Task<IActionResult> GetWishlist([FromQuery] PaginationRequest? pagination)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var wishlist = await _wishlistManager.GetWishlistAsync(userId);
-        return Ok(wishlist);
+        var p = pagination ?? new PaginationRequest();
+
+        if (p.PageSize == int.MaxValue)
+        {
+            var wishlist = await _wishlistManager.GetWishlistAsync(userId);
+            return Ok(wishlist);
+        }
+
+        var result = await _wishlistManager.GetWishlistPagedAsync(userId, p);
+        return Ok(result);
     }
 
     [HttpPost("toggle")]

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sayiad.Data.Common;
+using Sayiad.Data.Data;
 using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Dtos.AuctionDtos;
 
@@ -12,6 +13,8 @@ public class AuctionManager : IAuctionManager
     private readonly IProductRepository _productRepo;
     private readonly INotificationManager _notificationManager;
     private readonly IEmailService _emailService;
+    private readonly IUserRepository _userRepo;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<AuctionManager> _logger;
 
     public AuctionManager(
@@ -19,12 +22,16 @@ public class AuctionManager : IAuctionManager
         IProductRepository productRepo,
         INotificationManager notificationManager,
         IEmailService emailService,
+        IUserRepository userRepo,
+        IUnitOfWork unitOfWork,
         ILogger<AuctionManager> logger)
     {
         _auctionRepo = auctionRepo;
         _productRepo = productRepo;
         _notificationManager = notificationManager;
         _emailService = emailService;
+        _userRepo = userRepo;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -52,13 +59,24 @@ public class AuctionManager : IAuctionManager
             auction.Bids.OrderByDescending(b => b.Amount)
                 .Select(b => new BidResponse(
                     b.Id, b.UserId, b.User!.FullName, b.Amount,
-                    b.IsAutoBid, b.BidStatus.ToString(), b.CreatedAt))
+                    b.IsAutoBid, b.MaxAutoBidAmount, b.BidStatus.ToString(), b.CreatedAt))
                 .ToList()
         );
     }
 
     public async Task<AuctionResponse> CreateAsync(int userId, CreateAuctionRequest request)
     {
+        var user = await _userRepo.GetByIdAsync(userId);
+        if (user is null)
+            throw new KeyNotFoundException("User not found");
+
+        var monthlyLimit = SubscriptionManager.GetMonthlyLimit(user.SubscriptionTier);
+        var monthlyCount = await _auctionRepo.GetUserMonthlyAuctionCountAsync(userId);
+
+        if (monthlyCount >= monthlyLimit)
+            throw new InvalidOperationException(
+                "You have reached your monthly auction limit. Upgrade your subscription to create more auctions.");
+
         var product = await _productRepo.GetByIdAsync(request.ProductId)
             ?? throw new KeyNotFoundException("Product not found");
 
@@ -98,7 +116,9 @@ public class AuctionManager : IAuctionManager
         {
             try
             {
-                return await PlaceBidInternalAsync(auctionId, userId, amount);
+                var result = await PlaceBidInternalAsync(auctionId, userId, amount, request.MaxAutoBidAmount);
+                await ResolveAutoBidsAsync(auctionId);
+                return result;
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -114,7 +134,7 @@ public class AuctionManager : IAuctionManager
         throw new InvalidOperationException("Bid placement failed");
     }
 
-    private async Task<BidResponse> PlaceBidInternalAsync(int auctionId, int userId, decimal amount)
+    private async Task<BidResponse> PlaceBidInternalAsync(int auctionId, int userId, decimal amount, decimal? maxAutoBid)
     {
         var auction = await _auctionRepo.GetByIdWithBidsAsync(auctionId)
             ?? throw new KeyNotFoundException("Auction not found");
@@ -129,7 +149,7 @@ public class AuctionManager : IAuctionManager
         if (auction.EndTime <= DateTime.UtcNow)
         {
             auction.Status = AuctionStatus.Finished;
-            await _auctionRepo.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             throw new InvalidOperationException("Auction has ended");
         }
 
@@ -149,6 +169,7 @@ public class AuctionManager : IAuctionManager
             UserId = userId,
             Amount = amount,
             IsAutoBid = false,
+            MaxAutoBidAmount = maxAutoBid > amount ? maxAutoBid : null,
             BidStatus = BidStatus.Winning,
             CreatedAt = DateTime.UtcNow
         };
@@ -156,7 +177,7 @@ public class AuctionManager : IAuctionManager
         auction.Bids.Add(bid);
         auction.CurrentHighestBid = amount;
 
-        await _auctionRepo.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         if (previousWinnerId.HasValue && previousWinnerId.Value != userId)
         {
@@ -169,7 +190,67 @@ public class AuctionManager : IAuctionManager
 
         return new BidResponse(
             bid.Id, bid.UserId, string.Empty, bid.Amount,
-            bid.IsAutoBid, bid.BidStatus.ToString(), bid.CreatedAt);
+            bid.IsAutoBid, bid.MaxAutoBidAmount, bid.BidStatus.ToString(), bid.CreatedAt);
+    }
+
+    private async Task ResolveAutoBidsAsync(int auctionId)
+    {
+        const int maxIterations = 20;
+        for (int i = 0; i < maxIterations; i++)
+        {
+            var auction = await _auctionRepo.GetByIdWithBidsAsync(auctionId);
+            if (auction == null || auction.Status != AuctionStatus.Active) return;
+
+            var currentWinnerId = auction.Bids
+                .Where(b => b.BidStatus == BidStatus.Winning)
+                .Select(b => b.UserId)
+                .FirstOrDefault();
+
+            var bestAutoBid = auction.Bids
+                .Where(b => b.UserId != currentWinnerId
+                         && b.MaxAutoBidAmount > auction.CurrentHighestBid
+                         && (b.BidStatus == BidStatus.Valid || b.BidStatus == BidStatus.Winning))
+                .GroupBy(b => b.UserId)
+                .Select(g => new
+                {
+                    UserId = g.Key,
+                    MaxBid = g.Max(b => b.MaxAutoBidAmount!.Value)
+                })
+                .OrderByDescending(x => x.MaxBid)
+                .FirstOrDefault();
+
+            if (bestAutoBid == null) return;
+
+            var nextBid = Math.Min(
+                bestAutoBid.MaxBid,
+                auction.CurrentHighestBid + auction.MinimumIncrement);
+
+            if (nextBid <= auction.CurrentHighestBid) return;
+
+            foreach (var prevBid in auction.Bids.Where(b => b.BidStatus == BidStatus.Winning))
+            {
+                prevBid.BidStatus = BidStatus.Valid;
+            }
+
+            var autoBid = new Bid
+            {
+                AuctionId = auctionId,
+                UserId = bestAutoBid.UserId,
+                Amount = nextBid,
+                IsAutoBid = true,
+                MaxAutoBidAmount = bestAutoBid.MaxBid,
+                BidStatus = BidStatus.Winning,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            auction.Bids.Add(autoBid);
+            auction.CurrentHighestBid = nextBid;
+
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Auto-bid placed: {BidAmount} on auction {AuctionId} by user {UserId}",
+                nextBid, auctionId, bestAutoBid.UserId);
+        }
     }
 
     public async Task<AuctionResponse> EndAuctionAsync(int auctionId, int userId)
@@ -199,7 +280,7 @@ public class AuctionManager : IAuctionManager
             }
         }
 
-        await _auctionRepo.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         if (auction.WinnerUserId.HasValue)
         {
@@ -214,8 +295,8 @@ public class AuctionManager : IAuctionManager
                 "You won an auction on Sayiad!",
                 $@"<p>Hello {auction.Winner.FullName},</p>
                    <p>Congratulations! You won the auction for
-                   <strong>{auction.Product!.Title}</strong>.</p>
-                   <p>Winning bid: <strong>{winningBid!.Amount:N2} EGP</strong></p>
+                   <strong>{auction.Product?.Title ?? "Item"}</strong>.</p>
+                   <p>Winning bid: <strong>{winningBid?.Amount:N2} EGP</strong></p>
                    <p>The seller will be in touch shortly.</p>");
         }
 
@@ -233,11 +314,11 @@ public class AuctionManager : IAuctionManager
     }
 
     private static AuctionResponse MapToResponse(Auction auction) => new(
-        auction.Id, auction.ProductId, auction.Product!.Title,
-        auction.Product.Images.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
+        auction.Id, auction.ProductId, auction.Product?.Title ?? "Deleted Product",
+        auction.Product?.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
         auction.WinnerUserId, auction.Winner?.FullName,
         auction.StartTime, auction.EndTime,
         auction.StartingPrice, auction.ReservePrice,
         auction.MinimumIncrement, auction.CurrentHighestBid,
-        auction.Status, auction.Bids.Count, auction.CreatedAt);
+        auction.Status, auction.Bids?.Count ?? 0, auction.CreatedAt);
 }

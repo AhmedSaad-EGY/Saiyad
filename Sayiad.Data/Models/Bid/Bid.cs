@@ -6,6 +6,7 @@ namespace Sayiad.Data.Models;
         public int UserId { get; set; }
         public decimal Amount { get; set; }
         public bool IsAutoBid { get; set; }
+        public decimal? MaxAutoBidAmount { get; set; }
         public BidStatus BidStatus { get; set; } // Valid, Rejected, Winning
         public DateTime CreatedAt { get; set; }
 

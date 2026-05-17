@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Data.Common;
 using Sayiad.Domain.Dtos.WishlistDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -19,10 +20,19 @@ public class WishlistManager : IWishlistManager
     public async Task<IEnumerable<WishlistItemResponse>> GetWishlistAsync(int userId)
     {
         var items = await _wishlistRepo.GetUserWishlistAsync(userId);
-        return items.Select(w => new WishlistItemResponse(
-            w.Id, w.ProductId, w.Product.Title, w.Product.Price,
-            w.Product.Images.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
-            w.CreatedAt));
+        return items.Select(MapItem);
+    }
+
+    public async Task<PagedResult<WishlistItemResponse>> GetWishlistPagedAsync(int userId, PaginationRequest pagination)
+    {
+        var result = await _wishlistRepo.GetUserWishlistPagedAsync(userId, pagination);
+        return new PagedResult<WishlistItemResponse>
+        {
+            Items = result.Items.Select(MapItem).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        };
     }
 
     public async Task<(WishlistItemResponse? Item, bool Added)> ToggleAsync(int userId, ToggleWishlistRequest request)
@@ -66,4 +76,9 @@ public class WishlistManager : IWishlistManager
             await _wishlistRepo.RemoveAsync(item);
         }
     }
+
+    private static WishlistItemResponse MapItem(Wishlist w) => new(
+        w.Id, w.ProductId, w.Product.Title, w.Product.Price,
+        w.Product.Images.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
+        w.CreatedAt);
 }

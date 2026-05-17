@@ -15,6 +15,7 @@ try
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("Dev")));
+    builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = jwtSettings["SecretKey"]
@@ -36,6 +37,18 @@ try
             ValidIssuer = jwtSettings["Issuer"],
             ValidAudience = jwtSettings["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        };
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -92,14 +105,17 @@ try
     builder.Services.AddScoped<ISellerProfileRepository, SellerProfileRepository>();
     builder.Services.AddScoped<ISellerProfileManager, SellerProfileManager>();
     builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+    builder.Services.AddScoped<ISubscriptionManager, SubscriptionManager>();
+
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
     builder.Services.AddScoped<IEmailService, SmtpEmailService>();
     builder.Services.AddScoped<IAuthManager, AuthManager>();
     builder.Services.AddScoped<IUserManager, UserManager>();
-    MappingConfig.Configure();
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
     builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddSignalR();
     builder.Services.AddControllers();
     builder.Services.AddHealthChecks()
         .AddSqlServer(
@@ -111,7 +127,25 @@ try
 
     var app = builder.Build();
 
+    // Apply pending EF migrations on startup in production
+    if (app.Environment.IsProduction())
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Database.MigrateAsync();
+            Log.Information("Database migrations applied successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to apply database migrations. App will continue but some features may not work.");
+        }
+    }
+
     app.UseSerilogRequestLogging();
+    app.UseMiddleware<Sayiad.Api.Middleware.InputSanitizationMiddleware>();
+    app.UseMiddleware<Sayiad.Api.Middleware.RequestLoggingMiddleware>();
     app.UseMiddleware<Sayiad.Api.Middleware.ExceptionMiddleware>();
 
     //if (app.Environment.IsDevelopment())
@@ -128,8 +162,10 @@ try
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");
+    app.MapHub<AuctionHub>("/hubs/auction");
 
     Log.Information("Sayiad API starting");
+
     app.Run();
 }
 catch (Exception ex)

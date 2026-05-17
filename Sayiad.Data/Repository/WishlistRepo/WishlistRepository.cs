@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Sayiad.Data.Repository.WishlistRepo;
+using Sayiad.Data.Common;
 using Sayiad.Data.Data;
+using Sayiad.Data.Repository.WishlistRepo;
 
 namespace Sayiad.Data.Repository.WishlistRepo;
 
@@ -20,6 +21,28 @@ public class WishlistRepository : IWishlistRepository
             .Where(w => w.UserId == userId)
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync();
+    }
+
+    public async Task<PagedResult<Wishlist>> GetUserWishlistPagedAsync(int userId, PaginationRequest pagination)
+    {
+        var query = _db.Wishlists
+            .Include(w => w.Product).ThenInclude(p => p.Images)
+            .Where(w => w.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(w => w.CreatedAt)
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<Wishlist>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
     }
 
     public async Task<Wishlist?> GetByUserAndProductAsync(int userId, int productId)

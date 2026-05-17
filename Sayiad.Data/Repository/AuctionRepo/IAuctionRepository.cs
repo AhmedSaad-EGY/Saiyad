@@ -9,6 +9,6 @@ public interface IAuctionRepository
     Task<Auction?> GetByIdWithBidsAsync(int auctionId);
     Task<Auction?> GetByIdWithDetailsAsync(int auctionId);
     Task AddAsync(Auction auction);
-    Task<int> SaveChangesAsync();
     Task<List<Auction>> GetExpiredActiveAsync();
+    Task<int> GetUserMonthlyAuctionCountAsync(int userId);
 }

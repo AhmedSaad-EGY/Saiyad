@@ -84,7 +84,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("WinnerUserId");
 
-                    b.ToTable("Auctions");
+                    b.ToTable("Auctions", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Bid", b =>
@@ -110,6 +110,9 @@ namespace Sayiad.Data.Migrations
                     b.Property<bool>("IsAutoBid")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("MaxAutoBidAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
@@ -119,7 +122,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Bids");
+                    b.ToTable("Bids", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Cart", b =>
@@ -144,7 +147,7 @@ namespace Sayiad.Data.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Carts");
+                    b.ToTable("Carts", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.CartItem", b =>
@@ -173,7 +176,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("CartItems");
+                    b.ToTable("CartItems", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Category", b =>
@@ -196,7 +199,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.CustomerOrder", b =>
@@ -237,7 +240,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("ShippingAddressId");
 
-                    b.ToTable("CustomerOrders");
+                    b.ToTable("CustomerOrders", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Notification", b =>
@@ -269,7 +272,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.OrderItem", b =>
@@ -309,7 +312,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("SellerId");
 
-                    b.ToTable("OrderItems");
+                    b.ToTable("OrderItems", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Payment", b =>
@@ -344,7 +347,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Product", b =>
@@ -417,7 +420,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("SellerId");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.ProductImage", b =>
@@ -445,7 +448,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("ProductImages");
+                    b.ToTable("ProductImages", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Report", b =>
@@ -479,7 +482,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("ReporterId");
 
-                    b.ToTable("Reports");
+                    b.ToTable("Reports", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Review", b =>
@@ -511,7 +514,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Reviews");
+                    b.ToTable("Reviews", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.SellerProfile", b =>
@@ -546,7 +549,7 @@ namespace Sayiad.Data.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("SellerProfiles");
+                    b.ToTable("SellerProfiles", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.ShippingAddress", b =>
@@ -590,7 +593,40 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ShippingAddresses");
+                    b.ToTable("ShippingAddresses", (string)null);
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.Subscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Tier")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Subscriptions", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Transaction", b =>
@@ -622,7 +658,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("PaymentId");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.User", b =>
@@ -663,6 +699,12 @@ namespace Sayiad.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PasswordResetToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiry")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -679,6 +721,9 @@ namespace Sayiad.Data.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
+                    b.Property<int>("SubscriptionTier")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -689,7 +734,7 @@ namespace Sayiad.Data.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Wishlist", b =>
@@ -715,7 +760,7 @@ namespace Sayiad.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Wishlists");
+                    b.ToTable("Wishlists", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Auction", b =>
@@ -951,6 +996,17 @@ namespace Sayiad.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Sayiad.Data.Models.Subscription", b =>
+                {
+                    b.HasOne("Sayiad.Data.Models.User", "User")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Sayiad.Data.Models.Transaction", b =>
                 {
                     b.HasOne("Sayiad.Data.Models.Payment", "Payment")
@@ -1046,6 +1102,8 @@ namespace Sayiad.Data.Migrations
                     b.Navigation("ShippingAddresses");
 
                     b.Navigation("SoldOrderItems");
+
+                    b.Navigation("Subscriptions");
 
                     b.Navigation("Wishlists");
 

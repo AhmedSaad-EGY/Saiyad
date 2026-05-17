@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Data.Data;
 using Sayiad.Domain.Dtos.PaymentDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -7,15 +8,18 @@ public class PaymentManager : IPaymentManager
 {
     private readonly IPaymentRepository _paymentRepo;
     private readonly IOrderRepository _orderRepo;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PaymentManager> _logger;
 
     public PaymentManager(
         IPaymentRepository paymentRepo,
         IOrderRepository orderRepo,
+        IUnitOfWork unitOfWork,
         ILogger<PaymentManager> logger)
     {
         _paymentRepo = paymentRepo;
         _orderRepo = orderRepo;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -29,6 +33,8 @@ public class PaymentManager : IPaymentManager
 
         if (order.Status != CustomerOrderStatus.Pending)
             throw new InvalidOperationException("Order is not pending payment");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         var payment = new Payment
         {
@@ -49,6 +55,8 @@ public class PaymentManager : IPaymentManager
 
         payment.Transactions.Add(transaction);
         await _paymentRepo.AddAsync(payment);
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation("Payment initiated: {PaymentId} for order {OrderId}", payment.Id, request.OrderId);
         return MapToResponse(payment);
@@ -64,6 +72,8 @@ public class PaymentManager : IPaymentManager
 
         if (payment.PaymentStatus != "Pending")
             throw new InvalidOperationException("Payment is already processed");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         payment.PaymentStatus = "Paid";
         payment.PaidAt = DateTime.UtcNow;
@@ -81,6 +91,8 @@ public class PaymentManager : IPaymentManager
         payment.Order.UpdatedAt = DateTime.UtcNow;
 
         await _paymentRepo.UpdateAsync(payment);
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation("Payment confirmed: {PaymentId}", paymentId);
         return MapToResponse(payment);

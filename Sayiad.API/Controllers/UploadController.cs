@@ -6,7 +6,7 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Fisherman,BaitSeller")]
+[Authorize(Roles = "Fisherman,BaitSeller,Auctioneer")]
 public class UploadController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;
@@ -19,6 +19,7 @@ public class UploadController : ControllerBase
     }
 
     [HttpPost]
+    [RequestSizeLimit(5 * 1024 * 1024)]
     public async Task<IActionResult> Upload(IFormFile file)
     {
         if (file == null || file.Length == 0)

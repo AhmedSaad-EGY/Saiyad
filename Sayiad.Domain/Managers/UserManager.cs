@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Dtos.UserDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -27,7 +28,7 @@ public class UserManager : IUserManager
         var user = await _userRepo.GetByIdAsync(userId)
             ?? throw new KeyNotFoundException("User not found");
 
-        user.FullName = request.FullName;
+        user.FullName = InputSanitizer.Sanitize(request.FullName);
         user.Phone = request.Phone;
         user.ProfileImage = request.ProfileImage;
         user.UpdatedAt = DateTime.UtcNow;

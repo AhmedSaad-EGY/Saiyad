@@ -7,6 +7,7 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequestSizeLimit(1 * 1024 * 1024)]
 public class ReviewsController : ControllerBase
 {
     private readonly IReviewManager _reviewManager;

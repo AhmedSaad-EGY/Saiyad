@@ -1,3 +1,4 @@
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Dtos.SellerProfileDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -27,8 +28,8 @@ public class SellerProfileManager : ISellerProfileManager
         var profile = new SellerProfile
         {
             UserId = userId,
-            StoreName = request.StoreName,
-            StoreDescription = request.Description ?? string.Empty,
+            StoreName = InputSanitizer.Sanitize(request.StoreName),
+            StoreDescription = InputSanitizer.SanitizeNullable(request.Description) ?? string.Empty,
             AverageRating = 0,
             TotalSales = 0,
             CreatedAt = DateTime.UtcNow
@@ -46,8 +47,8 @@ public class SellerProfileManager : ISellerProfileManager
         if (profile.UserId != userId)
             throw new UnauthorizedAccessException("You can only update your own profile.");
 
-        profile.StoreName = request.StoreName;
-        profile.StoreDescription = request.Description ?? string.Empty;
+        profile.StoreName = InputSanitizer.Sanitize(request.StoreName);
+        profile.StoreDescription = InputSanitizer.SanitizeNullable(request.Description) ?? string.Empty;
 
         var updated = await _repo.UpdateAsync(profile);
         return MapToResponse(updated);
