@@ -53,22 +53,19 @@ try
     });
 
     builder.Services.AddAuthorization();
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowFrontend", policy =>
         {
             policy
-                .WithOrigins(
-                    "http://localhost:3000",
-                    "http://localhost:5173",
-                    "http://localhost:8000",
-                    "https://sayiad.vercel.app"
-                )
+                .WithOrigins("https://saiyad-eg.vercel.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
         });
     });
+
     builder.Services.AddRateLimiter(options =>
     {
         options.AddFixedWindowLimiter("auth", limiterOptions =>
@@ -80,6 +77,7 @@ try
         });
         options.RejectionStatusCode = 429;
     });
+
     builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
     builder.Services.AddScoped<ICategoryManager, CategoryManager>();
     builder.Services.AddScoped<IProductRepository, ProductRepository>();

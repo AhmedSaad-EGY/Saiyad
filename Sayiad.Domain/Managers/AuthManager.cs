@@ -119,11 +119,10 @@ public class AuthManager : IAuthManager
     {
         var user = await _userRepo.GetByEmailAsync(request.Email);
 
-        // Always return success to avoid leaking user existence
         if (user is null)
         {
             _logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
-            return Result.Success();
+            return Result.Failure("Email not found.");
         }
 
         var otp = Random.Shared.Next(100000, 999999).ToString();
@@ -142,6 +141,25 @@ public class AuthManager : IAuthManager
                <p>If you did not request a password reset, ignore this email.</p>");
 
         _logger.LogInformation("Password reset OTP sent to: {Email}", request.Email);
+        return Result.Success();
+    }
+
+    public async Task<Result> VerifyResetCodeAsync(string email, string token)
+    {
+        var user = await _userRepo.GetByEmailAsync(email);
+
+        if (user is null)
+            return Result.Failure("Invalid reset attempt.");
+
+        if (user.PasswordResetToken is null || user.PasswordResetTokenExpiry is null)
+            return Result.Failure("No password reset was requested.");
+
+        if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            return Result.Failure("Reset code has expired. Please request a new one.");
+
+        if (!BCrypt.Net.BCrypt.Verify(token, user.PasswordResetToken))
+            return Result.Failure("Invalid reset code.");
+
         return Result.Success();
     }
 

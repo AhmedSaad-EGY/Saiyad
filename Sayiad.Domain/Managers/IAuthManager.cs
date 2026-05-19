@@ -11,5 +11,6 @@ public interface IAuthManager
     Task LogoutAsync(int userId);
     Task VerifyEmailAsync(string token);
     Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request);
+    Task<Result> VerifyResetCodeAsync(string email, string token);
     Task<Result> ResetPasswordAsync(ResetPasswordRequest request);
 }
