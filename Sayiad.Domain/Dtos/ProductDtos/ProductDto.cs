@@ -23,6 +23,8 @@ public record UpdateProductRequest(
 
 public record AddProductImageRequest(string ImageUrl, bool IsPrimary);
 
+public record UpdateProductStatusRequest(ProductStatus Status);
+
 public record ProductImageResponse(
     int Id,
     int ProductId,

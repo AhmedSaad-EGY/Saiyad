@@ -84,4 +84,12 @@ public class ProductsController : ControllerBase
         await _productManager.DeleteImageAsync(id, imageId, sellerId);
         return NoContent();
     }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateProductStatusRequest request)
+    {
+        var product = await _productManager.UpdateStatusAsync(id, request.Status);
+        return Ok(product);
+    }
 }

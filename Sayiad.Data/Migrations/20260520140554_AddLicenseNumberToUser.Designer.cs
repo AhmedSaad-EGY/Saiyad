@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sayiad.Data.Data;
 
@@ -11,9 +12,11 @@ using Sayiad.Data.Data;
 namespace Sayiad.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260520140554_AddLicenseNumberToUser")]
+    partial class AddLicenseNumberToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -420,8 +423,7 @@ namespace Sayiad.Data.Migrations
 
                     b.Property<string>("PaymentStatus")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -692,7 +694,7 @@ namespace Sayiad.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("PaymentReference")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
@@ -704,10 +706,6 @@ namespace Sayiad.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("PaymentReference")
-                        .IsUnique()
-                        .HasFilter("[PaymentReference] IS NOT NULL");
 
                     b.HasIndex("UserId");
 

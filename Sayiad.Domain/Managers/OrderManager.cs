@@ -93,13 +93,6 @@ public class OrderManager : IOrderManager
 
         order = await _orderRepo.CreateOrderTransactionAsync(order, userId);
 
-        foreach (var cartItem in cart.CartItems)
-        {
-            var product = productCache[cartItem.ProductId];
-            product.StockQuantity -= cartItem.Quantity;
-            await _productRepo.UpdateAsync(product);
-        }
-
         await _unitOfWork.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -150,6 +143,43 @@ public class OrderManager : IOrderManager
             !order.OrderItems.Any(oi => oi.SellerId == userId))
             throw new UnauthorizedAccessException("Access denied");
 
+        return MapToResponse(order);
+    }
+
+    public async Task<OrderResponse> CancelAsync(int orderId, int userId)
+    {
+        var order = await _orderRepo.GetByIdAsync(orderId)
+            ?? throw new KeyNotFoundException("Order not found");
+
+        if (order.BuyerId != userId)
+            throw new UnauthorizedAccessException("You can only cancel your own orders");
+
+        if (order.Status != CustomerOrderStatus.Pending)
+            throw new InvalidOperationException("Only pending orders can be cancelled");
+
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+
+        order.Status = CustomerOrderStatus.Cancelled;
+        order.UpdatedAt = DateTime.UtcNow;
+
+        foreach (var orderItem in order.OrderItems)
+        {
+            var product = orderItem.Product;
+            if (product != null)
+            {
+                product.StockQuantity += orderItem.Quantity;
+                await _productRepo.UpdateAsync(product);
+            }
+        }
+
+        await _orderRepo.UpdateAsync(order);
+        await _unitOfWork.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        await _notificationManager.CreateAsync(userId, "Order Cancelled",
+            $"Your order #{order.Id} has been cancelled.");
+
+        _logger.LogInformation("Order cancelled: {OrderId} by user {UserId}", orderId, userId);
         return MapToResponse(order);
     }
 

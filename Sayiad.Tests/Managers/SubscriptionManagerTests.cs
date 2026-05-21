@@ -20,6 +20,7 @@ public class SubscriptionManagerTests
         _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
         _subRepoMock.Setup(r => r.GetActiveAsync(1)).ReturnsAsync((Subscription?)null);
         _subRepoMock.Setup(r => r.GetMonthlyAuctionCountAsync(1)).ReturnsAsync(0);
+        _subRepoMock.Setup(r => r.PaymentReferenceExistsAsync("pay_123")).ReturnsAsync(false);
 
         var manager = CreateManager();
         var result = await manager.UpgradeAsync(1,
@@ -28,6 +29,7 @@ public class SubscriptionManagerTests
         result.IsSuccess.Should().BeTrue();
         result.Data!.Tier.Should().Be("Pro");
         result.Data.AuctionsPerMonth.Should().Be(25);
+        result.Data.PaymentReference.Should().Be("pay_123");
         user.SubscriptionTier.Should().Be(SubscriptionTier.Pro);
     }
 
@@ -42,6 +44,21 @@ public class SubscriptionManagerTests
             new UpgradeSubscriptionRequest("Ultra", "pay_123"));
 
         result.IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpgradeAsync_WithDuplicatePaymentReference_ReturnsFailure()
+    {
+        var user = new User { Id = 1, SubscriptionTier = SubscriptionTier.Free };
+        _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
+        _subRepoMock.Setup(r => r.PaymentReferenceExistsAsync("pay_dup")).ReturnsAsync(true);
+
+        var manager = CreateManager();
+        var result = await manager.UpgradeAsync(1,
+            new UpgradeSubscriptionRequest("Pro", "pay_dup"));
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("Duplicate");
     }
 
     [Fact]

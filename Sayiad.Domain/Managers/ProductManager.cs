@@ -145,6 +145,20 @@ public class ProductManager : IProductManager
         _logger.LogInformation("Image {ImageId} deleted from product {ProductId}", imageId, productId);
     }
 
+    public async Task<ProductResponse> UpdateStatusAsync(int id, ProductStatus status)
+    {
+        var product = await _repo.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        product.Status = status;
+        product.UpdatedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(product);
+        _logger.LogInformation("Product {ProductId} status updated to {Status} by admin", id, status);
+
+        return MapToResponse(product);
+    }
+
     public async Task<IEnumerable<ProductResponse>> GetSellerProductsAsync(int sellerId)
     {
         var products = await _repo.GetSellerProductsAsync(sellerId);

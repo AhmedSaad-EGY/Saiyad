@@ -32,7 +32,7 @@ public class PaymentManager : IPaymentManager
             throw new UnauthorizedAccessException("You can only pay for your own orders");
 
         if (order.Status != CustomerOrderStatus.Pending)
-            throw new InvalidOperationException("Order is not pending payment");
+            throw new InvalidOperationException("Cannot initiate payment: order is not in Pending status.");
 
         await using var tx = await _unitOfWork.BeginTransactionAsync();
 
@@ -41,7 +41,7 @@ public class PaymentManager : IPaymentManager
             OrderId = request.OrderId,
             Amount = order.TotalPrice,
             PaymentMethod = request.PaymentMethod,
-            PaymentStatus = "Pending",
+            PaymentStatus = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -70,12 +70,12 @@ public class PaymentManager : IPaymentManager
         if (payment.Order.BuyerId != userId)
             throw new UnauthorizedAccessException("You cannot confirm another user's payment.");
 
-        if (payment.PaymentStatus != "Pending")
-            throw new InvalidOperationException("Payment is already processed");
+        if (payment.PaymentStatus != PaymentStatus.Pending)
+            throw new InvalidOperationException("Cannot confirm payment: current status is not Pending.");
 
         await using var tx = await _unitOfWork.BeginTransactionAsync();
 
-        payment.PaymentStatus = "Paid";
+        payment.PaymentStatus = PaymentStatus.Confirmed;
         payment.PaidAt = DateTime.UtcNow;
 
         var transaction = new Transaction
@@ -106,7 +106,7 @@ public class PaymentManager : IPaymentManager
 
     private static PaymentResponse MapToResponse(Payment p) => new(
         p.Id, p.OrderId, p.Amount, p.PaymentMethod,
-        p.PaymentStatus, p.PaidAt, p.CreatedAt,
+        p.PaymentStatus.ToString(), p.PaidAt, p.CreatedAt,
         p.Transactions.OrderByDescending(t => t.CreatedAt)
             .Select(t => new TransactionResponse(
                 t.Id, t.TransactionReference, t.Amount, t.Status, t.CreatedAt))

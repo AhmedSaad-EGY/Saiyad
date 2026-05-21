@@ -35,7 +35,11 @@ public class SubscriptionManager : ISubscriptionManager
             return Result<SubscriptionResponse>.Failure("User not found.");
 
         if (!Enum.TryParse<SubscriptionTier>(request.Tier, out var tier))
-            return Result<SubscriptionResponse>.Failure("Invalid subscription tier.");
+            return Result<SubscriptionResponse>.Failure("Invalid subscription tier. Must be one of: Basic, Pro, Enterprise.");
+
+        var duplicateRef = await _subRepo.PaymentReferenceExistsAsync(request.PaymentReference);
+        if (duplicateRef)
+            return Result<SubscriptionResponse>.Failure("Payment reference already exists. Duplicate payment references are not allowed.");
 
         var activeSub = await _subRepo.GetActiveAsync(userId);
         if (activeSub is not null)
@@ -82,7 +86,7 @@ public class SubscriptionManager : ISubscriptionManager
             return Result<SubscriptionResponse>.Success(new SubscriptionResponse(
                 0, "Free", limits.Price, limits.AuctionsPerMonth,
                 used, limits.AuctionsPerMonth - used,
-                DateTime.UtcNow, null, true, null
+                DateTime.UtcNow, null, true, null, null
             ));
         }
 
@@ -124,7 +128,8 @@ public class SubscriptionManager : ISubscriptionManager
             sub.StartDate,
             sub.EndDate,
             sub.IsActive,
-            sub.IsActive ? sub.StartDate.AddMonths(1) : null
+            sub.IsActive ? sub.StartDate.AddMonths(1) : null,
+            sub.PaymentReference
         );
     }
 
@@ -141,6 +146,7 @@ public class SubscriptionManager : ISubscriptionManager
             DateTime.UtcNow,
             null,
             true,
+            null,
             null
         );
     }

@@ -18,7 +18,7 @@ public class ProductRepository : IProductRepository
     {
         var query = _db.Products
             .Include(p => p.Category)
-            .Where(p => p.DeletedAt == null && p.Status != ProductStatus.Draft)
+            .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available)
             .AsQueryable();
 
         if (filter.CategoryId.HasValue)
@@ -36,10 +36,25 @@ public class ProductRepository : IProductRepository
                 p.Title.Contains(filter.SearchTerm) ||
                 p.Description.Contains(filter.SearchTerm));
 
+        if (filter.InStock == true)
+            query = query.Where(p => p.StockQuantity > 0);
+
         var totalCount = await query.CountAsync();
 
-        var items = await query
-            .OrderByDescending(p => p.CreatedAt)
+        IOrderedQueryable<Product> ordered = (filter.SortBy?.ToLower()) switch
+        {
+            "price" => filter.SortDirection?.ToLower() == "asc"
+                ? query.OrderBy(p => p.Price)
+                : query.OrderByDescending(p => p.Price),
+            "title" => filter.SortDirection?.ToLower() == "asc"
+                ? query.OrderBy(p => p.Title)
+                : query.OrderByDescending(p => p.Title),
+            _ => filter.SortDirection?.ToLower() == "asc"
+                ? query.OrderBy(p => p.CreatedAt)
+                : query.OrderByDescending(p => p.CreatedAt),
+        };
+
+        var items = await ordered
             .Skip((pagination.Page - 1) * pagination.PageSize)
             .Take(pagination.PageSize)
             .ToListAsync();

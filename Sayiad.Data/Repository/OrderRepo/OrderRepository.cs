@@ -88,8 +88,6 @@ public class OrderRepository : IOrderRepository
 
     public async Task<CustomerOrder> CreateOrderTransactionAsync(CustomerOrder order, int userId)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync();
-
         foreach (var item in order.OrderItems)
         {
             var product = await _db.Products.FindAsync(item.ProductId)
@@ -106,9 +104,6 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(c => c.UserId == userId);
         if (cart != null)
             _db.CartItems.RemoveRange(cart.CartItems);
-
-        await _db.SaveChangesAsync();
-        await tx.CommitAsync();
 
         return order;
     }

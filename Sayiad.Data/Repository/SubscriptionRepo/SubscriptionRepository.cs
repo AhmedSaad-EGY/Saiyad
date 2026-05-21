@@ -68,6 +68,11 @@ public class SubscriptionRepository : ISubscriptionRepository
             .CountAsync(a => a.CreatedByUserId == userId && a.CreatedAt >= startOfMonth);
     }
 
+    public async Task<bool> PaymentReferenceExistsAsync(string paymentReference)
+    {
+        return await _db.Subscriptions.AnyAsync(s => s.PaymentReference == paymentReference);
+    }
+
     public async Task<Dictionary<int, int>> GetMonthlyAuctionCountsAsync(IEnumerable<int> userIds)
     {
         var now = DateTime.UtcNow;

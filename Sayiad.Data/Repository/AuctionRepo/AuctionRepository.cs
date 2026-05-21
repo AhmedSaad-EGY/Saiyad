@@ -15,7 +15,12 @@ public class AuctionRepository : IAuctionRepository
         var query = _db.Auctions
             .Include(a => a.Product!).ThenInclude(p => p.Images)
             .Include(a => a.Bids)
-            .Where(a => a.Status == AuctionStatus.Active && a.Product != null);
+            .Where(a => a.Product != null);
+
+        if (string.IsNullOrWhiteSpace(filter.Status))
+            query = query.Where(a => a.Status == AuctionStatus.Active);
+        else if (Enum.TryParse<AuctionStatus>(filter.Status, ignoreCase: true, out var statusFilter))
+            query = query.Where(a => a.Status == statusFilter);
 
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
             query = query.Where(a =>

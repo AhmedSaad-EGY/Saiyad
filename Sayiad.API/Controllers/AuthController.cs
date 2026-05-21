@@ -60,6 +60,14 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Email verified successfully. You can now log in." });
     }
 
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResendVerification(ResendVerificationRequest request)
+    {
+        await _authManager.ResendVerificationAsync(request.Email);
+        return Ok(new { message = "Verification email sent." });
+    }
+
     [HttpPost("forgot-password")]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)

@@ -11,4 +11,5 @@ public interface IOrderManager
     Task<IEnumerable<OrderResponse>> GetSellerOrdersAsync(int sellerId);
     Task<OrderResponse> GetByIdAsync(int orderId, int userId);
     Task<OrderResponse> UpdateStatusAsync(int orderId, CustomerOrderStatus status);
+    Task<OrderResponse> CancelAsync(int orderId, int userId);
 }

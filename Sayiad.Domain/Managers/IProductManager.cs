@@ -14,4 +14,5 @@ public interface IProductManager
     Task<IEnumerable<ProductResponse>> GetSellerProductsAsync(int sellerId);
     Task<ProductImageResponse> AddImageAsync(int productId, int sellerId, AddProductImageRequest request);
     Task DeleteImageAsync(int productId, int imageId, int sellerId);
+    Task<ProductResponse> UpdateStatusAsync(int id, ProductStatus status);
 }

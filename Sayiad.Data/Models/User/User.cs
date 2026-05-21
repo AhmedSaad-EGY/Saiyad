@@ -15,6 +15,7 @@ namespace Sayiad.Data.Models;
         public DateTime? RefreshTokenExpiry { get; set; }
         public string? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }
+        public string? LicenseNumber { get; set; }
         public SubscriptionTier SubscriptionTier { get; set; } = SubscriptionTier.Free;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

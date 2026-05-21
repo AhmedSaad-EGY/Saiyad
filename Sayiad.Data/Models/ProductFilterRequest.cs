@@ -1,5 +1,3 @@
-using Sayiad.Data.Models;
-
 namespace Sayiad.Data.Models;
 
 public record ProductFilterRequest(
@@ -8,5 +6,8 @@ public record ProductFilterRequest(
     decimal? MaxPrice,
     ProductCondition? Condition,
     string? Location,
-    string? SearchTerm
+    string? SearchTerm,
+    bool? InStock = null,
+    string? SortBy = null,
+    string? SortDirection = null
 );

@@ -4,5 +4,6 @@ namespace Sayiad.Data.Models;
         Pending,
         Paid,
         Shipped,
-        Delivered
+        Delivered,
+        Cancelled
     }

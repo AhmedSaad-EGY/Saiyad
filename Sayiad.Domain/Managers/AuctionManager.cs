@@ -362,6 +362,15 @@ public class AuctionManager : IAuctionManager
         _logger.LogInformation("Auction request {Id} submitted by fisherman {FishermanId}",
             created.Id, fishermanId);
 
+        var auctioneers = await _userRepo.GetUsersByRoleAsync(UserRole.Auctioneer);
+        foreach (var auctioneer in auctioneers)
+        {
+            await _notificationManager.CreateAsync(
+                auctioneer.Id,
+                "New Auction Request",
+                $"Fisherman '{fisherman.FullName}' submitted a new auction request for '{created.ProductTitle}'.");
+        }
+
         return MapRequestToResponse(created);
     }
 

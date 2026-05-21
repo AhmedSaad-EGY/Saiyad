@@ -55,6 +55,11 @@ public class UserRepository : IUserRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task<IEnumerable<User>> GetUsersByRoleAsync(UserRole role)
+    {
+        return await _db.Users.Where(u => u.Role == role).OrderByDescending(u => u.CreatedAt).ToListAsync();
+    }
+
     public async Task<bool> EmailExistsAsync(string email)
     {
         return await _db.Users.AnyAsync(u => u.Email == email);

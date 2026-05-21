@@ -41,6 +41,7 @@ public class AuthManager : IAuthManager
             Role = Enum.Parse<UserRole>(request.Role),
             IsActive = true,
             IsEmailVerified = false,
+            LicenseNumber = request.LicenseNumber,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -49,7 +50,7 @@ public class AuthManager : IAuthManager
         user.EmailVerificationToken = HashToken(rawVerificationToken);
         await _userRepo.AddAsync(user);
 
-        var verifyUrl = $"https://sayiad.vercel.app/#/verify-email?token={rawVerificationToken}";
+        var verifyUrl = $"https://saiyad-eg.vercel.app/#/verify-email?token={rawVerificationToken}";
         await _emailService.SendAsync(
             user.Email,
             "Verify your Sayiad account",
@@ -113,6 +114,32 @@ public class AuthManager : IAuthManager
         await _userRepo.UpdateAsync(user);
 
         _logger.LogInformation("Email verified for user: {UserId}", user.Id);
+    }
+
+    public async Task ResendVerificationAsync(string email)
+    {
+        var user = await _userRepo.GetByEmailAsync(email)
+            ?? throw new KeyNotFoundException("User not found.");
+
+        if (user.IsEmailVerified)
+            throw new InvalidOperationException("Email is already verified.");
+
+        var rawToken = Guid.NewGuid().ToString("N");
+        user.EmailVerificationToken = HashToken(rawToken);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepo.UpdateAsync(user);
+
+        var verifyUrl = $"https://saiyad-eg.vercel.app/#/verify-email?token={rawToken}";
+        await _emailService.SendAsync(
+            user.Email,
+            "Verify your Sayiad account",
+            $@"<p>Hello {user.FullName},</p>
+               <p>Please verify your email to activate your Sayiad account:</p>
+               <p><a href='{verifyUrl}' style='background:#1a7f5a;color:#fff;padding:10px 20px;
+               border-radius:6px;text-decoration:none;'>Verify Email</a></p>
+               <p>If you did not register, ignore this email.</p>");
+
+        _logger.LogInformation("Verification email resent to: {Email}", user.Email);
     }
 
     public async Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request)

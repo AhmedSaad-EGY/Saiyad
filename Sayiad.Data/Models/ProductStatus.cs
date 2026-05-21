@@ -3,5 +3,7 @@ namespace Sayiad.Data.Models;
     {
         Available,
         Sold,
-        Draft
+        Draft,
+        Rejected,
+        Suspended
     }

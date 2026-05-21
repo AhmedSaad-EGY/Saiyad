@@ -44,7 +44,18 @@
                 o.Property(x => x.Subtotal).HasPrecision(18, 2);
             });
             modelBuilder.Entity<Payment>(p =>
-                p.Property(x => x.Amount).HasPrecision(18, 2));
+            {
+                p.Property(x => x.Amount).HasPrecision(18, 2);
+                p.Property(x => x.PaymentStatus)
+                    .HasMaxLength(20)
+                    .HasConversion(
+                        v => v == Models.PaymentStatus.Confirmed ? "Paid" : v.ToString(),
+                        v => v == "Paid" ? Models.PaymentStatus.Confirmed : Enum.Parse<Models.PaymentStatus>(v));
+            });
+            modelBuilder.Entity<Subscription>(s =>
+                s.HasIndex(x => x.PaymentReference)
+                    .IsUnique()
+                    .HasFilter("[PaymentReference] IS NOT NULL"));
             modelBuilder.Entity<SellerProfile>(s =>
                 s.Property(x => x.AverageRating).HasPrecision(3, 2));
             modelBuilder.Entity<Transaction>(t =>

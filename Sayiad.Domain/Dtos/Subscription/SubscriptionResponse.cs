@@ -10,5 +10,6 @@ public record SubscriptionResponse(
     DateTime StartDate,
     DateTime? EndDate,
     bool IsActive,
-    DateTime? RenewsAt
+    DateTime? RenewsAt,
+    string? PaymentReference
 );

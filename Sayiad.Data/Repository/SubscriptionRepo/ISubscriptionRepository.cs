@@ -11,4 +11,5 @@ public interface ISubscriptionRepository
     Task<PagedResult<Subscription>> GetAllAsync(PaginationRequest pagination);
     Task<int> GetMonthlyAuctionCountAsync(int userId);
     Task<Dictionary<int, int>> GetMonthlyAuctionCountsAsync(IEnumerable<int> userIds);
+    Task<bool> PaymentReferenceExistsAsync(string paymentReference);
 }

@@ -49,6 +49,14 @@ public class OrdersController : ControllerBase
         return Ok(order);
     }
 
+    [HttpPut("{id}/cancel")]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var order = await _orderManager.CancelAsync(id, userId);
+        return Ok(order);
+    }
+
     [Authorize(Roles = nameof(UserRole.Admin))]
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusRequest request)
