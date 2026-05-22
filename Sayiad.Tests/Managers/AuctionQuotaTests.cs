@@ -12,13 +12,30 @@ public class AuctionQuotaTests
     private readonly Mock<INotificationManager> _notificationManagerMock = new();
     private readonly Mock<IEmailService> _emailServiceMock = new();
     private readonly Mock<IUserRepository> _userRepoMock = new();
+    private readonly Mock<ISubscriptionPlanRepository> _planRepoMock = new();
     private readonly Mock<ILogger<AuctionManager>> _loggerMock = new();
+    private readonly Mock<IWalletManager> _walletManagerMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
+
+    private static readonly SubscriptionPlan BasicPlan = new()
+    {
+        Id = 2, Tier = SubscriptionTier.Basic, Name = "Basic", Price = 10,
+        MaxAuctionsPerMonth = 10, MaxBidsPerMonth = 20, MaxAuctionRequestsPerMonth = 10,
+        Features = "[]", IsActive = true, SortOrder = 2
+    };
+
+    private static readonly SubscriptionPlan FreePlan = new()
+    {
+        Id = 1, Tier = SubscriptionTier.Free, Name = "Free", Price = 0,
+        MaxAuctionsPerMonth = 3, MaxBidsPerMonth = 3, MaxAuctionRequestsPerMonth = 3,
+        Features = "[]", IsActive = true, SortOrder = 1
+    };
 
     private AuctionManager CreateManager() =>
         new(_auctionRepoMock.Object, _productRepoMock.Object,
             _notificationManagerMock.Object, _emailServiceMock.Object,
-            _userRepoMock.Object, _unitOfWorkMock.Object, _loggerMock.Object);
+            _userRepoMock.Object, _planRepoMock.Object,
+            _unitOfWorkMock.Object, _loggerMock.Object, _walletManagerMock.Object);
 
     [Fact]
     public async Task CreateAuction_UnderMonthlyLimit_Succeeds()
@@ -29,6 +46,7 @@ public class AuctionQuotaTests
         _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
         _auctionRepoMock.Setup(r => r.GetUserMonthlyAuctionCountAsync(1)).ReturnsAsync(3);
         _productRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(product);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Basic)).ReturnsAsync(BasicPlan);
         _auctionRepoMock.Setup(r => r.AddAsync(It.IsAny<Auction>()))
             .Returns(Task.CompletedTask)
             .Callback<Auction>(a => a.Id = 10);
@@ -58,6 +76,7 @@ public class AuctionQuotaTests
 
         _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
         _auctionRepoMock.Setup(r => r.GetUserMonthlyAuctionCountAsync(1)).ReturnsAsync(3);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Free)).ReturnsAsync(FreePlan);
 
         var manager = CreateManager();
         var request = new CreateAuctionRequest(1, DateTime.UtcNow.AddDays(7), 100, 50, 10);

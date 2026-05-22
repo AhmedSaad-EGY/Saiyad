@@ -10,10 +10,11 @@ public class ForgotPasswordTests
     private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IEmailService> _emailServiceMock = new();
     private readonly Mock<ILogger<AuthManager>> _loggerMock = new();
+    private readonly Mock<IWalletManager> _walletManagerMock = new();
 
     private AuthManager CreateManager() =>
         new(_userRepoMock.Object, _tokenServiceMock.Object,
-            _emailServiceMock.Object, _loggerMock.Object);
+            _emailServiceMock.Object, _walletManagerMock.Object, _loggerMock.Object);
 
     [Fact]
     public async Task ForgotPassword_WithExistingEmail_SendsEmailAndReturnsSuccess()

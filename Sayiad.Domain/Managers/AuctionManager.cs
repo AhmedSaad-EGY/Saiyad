@@ -14,8 +14,10 @@ public class AuctionManager : IAuctionManager
     private readonly INotificationManager _notificationManager;
     private readonly IEmailService _emailService;
     private readonly IUserRepository _userRepo;
+    private readonly ISubscriptionPlanRepository _planRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<AuctionManager> _logger;
+    private readonly IWalletManager _walletManager;
 
     public AuctionManager(
         IAuctionRepository auctionRepo,
@@ -23,16 +25,20 @@ public class AuctionManager : IAuctionManager
         INotificationManager notificationManager,
         IEmailService emailService,
         IUserRepository userRepo,
+        ISubscriptionPlanRepository planRepo,
         IUnitOfWork unitOfWork,
-        ILogger<AuctionManager> logger)
+        ILogger<AuctionManager> logger,
+        IWalletManager walletManager)
     {
         _auctionRepo = auctionRepo;
         _productRepo = productRepo;
         _notificationManager = notificationManager;
         _emailService = emailService;
         _userRepo = userRepo;
+        _planRepo = planRepo;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _walletManager = walletManager;
     }
 
     public async Task<PagedResult<AuctionResponse>> GetActiveAsync(AuctionFilterRequest? filter = null, PaginationRequest? pagination = null)
@@ -70,7 +76,8 @@ public class AuctionManager : IAuctionManager
         if (user is null)
             throw new KeyNotFoundException("User not found");
 
-        var monthlyLimit = SubscriptionManager.GetMonthlyLimit(user.SubscriptionTier);
+        var plan = await _planRepo.GetByTierAsync(user.SubscriptionTier);
+        var monthlyLimit = plan?.MaxAuctionsPerMonth ?? 3;
         var monthlyCount = await _auctionRepo.GetUserMonthlyAuctionCountAsync(userId);
 
         if (monthlyCount >= monthlyLimit)
@@ -112,6 +119,16 @@ public class AuctionManager : IAuctionManager
 
     public async Task<BidResponse> PlaceBidAsync(int auctionId, int userId, PlaceBidRequest request)
     {
+        var bidUser = await _userRepo.GetByIdAsync(userId)
+            ?? throw new KeyNotFoundException("User not found");
+
+        var bidPlan = await _planRepo.GetByTierAsync(bidUser.SubscriptionTier);
+        var bidLimit = bidPlan?.MaxBidsPerMonth ?? 3;
+        var bidCount = await _auctionRepo.GetUserMonthlyBidCountAsync(userId);
+        if (bidCount >= bidLimit)
+            throw new InvalidOperationException(
+                "You have reached your monthly bid limit. Upgrade your subscription to place more bids.");
+
         // Auto-bidding requires Basic subscription or higher
         if (request.MaxAutoBidAmount.HasValue && request.MaxAutoBidAmount > 0)
         {
@@ -165,10 +182,13 @@ public class AuctionManager : IAuctionManager
             throw new InvalidOperationException("Auction has ended");
         }
 
-        var previousWinnerId = auction.Bids
-            .Where(b => b.BidStatus == BidStatus.Winning)
-            .Select(b => (int?)b.UserId)
-            .FirstOrDefault();
+        if (!await _walletManager.HasSufficientBalanceAsync(userId, amount))
+            throw new InvalidOperationException("Insufficient balance. Please deposit funds to your wallet.");
+
+        var previousWinningBid = auction.Bids
+            .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
+        var previousWinnerId = previousWinningBid?.UserId;
+        var previousWinnerAmount = previousWinningBid?.Amount;
 
         foreach (var prevBid in auction.Bids.Where(b => b.BidStatus == BidStatus.Winning))
         {
@@ -193,6 +213,13 @@ public class AuctionManager : IAuctionManager
 
         if (previousWinnerId.HasValue && previousWinnerId.Value != userId)
         {
+            await _walletManager.ReleaseHeldFundsAsync(
+                previousWinnerId.Value, previousWinnerAmount!.Value, "Auction", auctionId);
+        }
+        await _walletManager.HoldFundsAsync(userId, amount, "Auction", auctionId);
+
+        if (previousWinnerId.HasValue && previousWinnerId.Value != userId)
+        {
             await _notificationManager.CreateAsync(previousWinnerId.Value, "Outbid",
                 $"You have been outbid on auction #{auctionId}.");
         }
@@ -213,10 +240,10 @@ public class AuctionManager : IAuctionManager
             var auction = await _auctionRepo.GetByIdWithBidsAsync(auctionId);
             if (auction == null || auction.Status != AuctionStatus.Active) return;
 
-            var currentWinnerId = auction.Bids
-                .Where(b => b.BidStatus == BidStatus.Winning)
-                .Select(b => b.UserId)
-                .FirstOrDefault();
+            var currentWinningBid = auction.Bids
+                .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
+            var currentWinnerId = currentWinningBid?.UserId;
+            var currentWinnerAmount = currentWinningBid?.Amount;
 
             var bestAutoBid = auction.Bids
                 .Where(b => b.UserId != currentWinnerId
@@ -260,6 +287,13 @@ public class AuctionManager : IAuctionManager
 
             await _unitOfWork.SaveChangesAsync();
 
+            if (currentWinnerId.HasValue && currentWinnerId.Value != bestAutoBid.UserId)
+            {
+                await _walletManager.ReleaseHeldFundsAsync(
+                    currentWinnerId.Value, currentWinnerAmount!.Value, "Auction", auctionId);
+            }
+            await _walletManager.HoldFundsAsync(bestAutoBid.UserId, nextBid, "Auction", auctionId);
+
             _logger.LogInformation("Auto-bid placed: {BidAmount} on auction {AuctionId} by user {UserId}",
                 nextBid, auctionId, bestAutoBid.UserId);
         }
@@ -294,6 +328,19 @@ public class AuctionManager : IAuctionManager
 
         await _unitOfWork.SaveChangesAsync();
 
+        if (auction.WinnerUserId.HasValue && winningBid != null && auction.Product != null)
+        {
+            await _walletManager.SettleAuctionPaymentAsync(
+                winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id);
+
+            var auctioneer = await _userRepo.GetByIdAsync(auction.CreatedByUserId);
+            if (auctioneer != null)
+            {
+                var fee = winningBid.Amount * 0.05m;
+                await _walletManager.CreditPlatformFeeAsync(auctioneer.Id, fee, "Auction", auction.Id);
+            }
+        }
+
         if (auction.WinnerUserId.HasValue)
         {
             await _notificationManager.CreateAsync(auction.WinnerUserId.Value, "Auction Won",
@@ -309,14 +356,25 @@ public class AuctionManager : IAuctionManager
                    <p>Congratulations! You won the auction for
                    <strong>{auction.Product?.Title ?? "Item"}</strong>.</p>
                    <p>Winning bid: <strong>{winningBid?.Amount:N2} EGP</strong></p>
-                   <p>The seller will be in touch shortly.</p>");
+                   <p>Payment of {winningBid?.Amount:N2} EGP has been deducted from your wallet."
+                   + (auction.Product != null
+                       ? $" The seller will receive 95% ({winningBid?.Amount * 0.95m:N2} EGP).</p>"
+                       : "</p>"));
         }
 
         if (auction.Product != null)
         {
             var winningAmount = winningBid?.Amount ?? 0;
+            var sellerAmount = winningAmount * 0.95m;
             await _notificationManager.CreateAsync(auction.Product.SellerId, "Auction Ended",
-                $"Your auction for '{auction.Product.Title}' has ended. Winning bid: {winningAmount} EGP.");
+                $"Your auction for '{auction.Product.Title}' has ended. Winning bid: {winningAmount} EGP. "
+                + $"You received {sellerAmount:N2} EGP (95% after 5% auctioneer fee).");
+        }
+
+        if (auction.WinnerUserId == null && winningBid != null)
+        {
+            await _walletManager.ReleaseHeldFundsAsync(
+                winningBid.UserId, winningBid.Amount, "Auction", auctionId);
         }
 
         _logger.LogInformation("Auction ended: {AuctionId}, winner: {WinnerId}",
@@ -342,6 +400,13 @@ public class AuctionManager : IAuctionManager
 
         if (fisherman.Role != UserRole.Fisherman)
             throw new UnauthorizedAccessException("Only Fishermen can submit auction requests.");
+
+        var requestPlan = await _planRepo.GetByTierAsync(fisherman.SubscriptionTier);
+        var requestLimit = requestPlan?.MaxAuctionRequestsPerMonth ?? 3;
+        var requestCount = await _auctionRepo.GetUserMonthlyRequestCountAsync(fishermanId);
+        if (requestCount >= requestLimit)
+            throw new InvalidOperationException(
+                "You have reached your monthly auction request limit. Upgrade your subscription to submit more requests.");
 
         var auctionRequest = new AuctionRequest
         {
@@ -429,9 +494,10 @@ public class AuctionManager : IAuctionManager
         var auctioneer = await _userRepo.GetByIdAsync(auctioneerId)
             ?? throw new KeyNotFoundException("Auctioneer not found");
 
-        var monthlyLimit = SubscriptionManager.GetMonthlyLimit(auctioneer.SubscriptionTier);
+        var auctioneerPlan = await _planRepo.GetByTierAsync(auctioneer.SubscriptionTier);
+        var auctioneerLimit = auctioneerPlan?.MaxAuctionsPerMonth ?? 3;
         var monthlyCount = await _auctionRepo.GetUserMonthlyAuctionCountAsync(auctioneerId);
-        if (monthlyCount >= monthlyLimit)
+        if (monthlyCount >= auctioneerLimit)
             throw new InvalidOperationException("Monthly auction limit reached. Upgrade subscription.");
 
         var createRequest = new CreateAuctionRequest(

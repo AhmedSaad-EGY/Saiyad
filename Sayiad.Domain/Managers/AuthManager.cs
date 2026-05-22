@@ -10,17 +10,20 @@ public class AuthManager : IAuthManager
     private readonly IUserRepository _userRepo;
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
+    private readonly IWalletManager _walletManager;
     private readonly ILogger<AuthManager> _logger;
 
     public AuthManager(
         IUserRepository userRepo,
         ITokenService tokenService,
         IEmailService emailService,
+        IWalletManager walletManager,
         ILogger<AuthManager> logger)
     {
         _userRepo = userRepo;
         _tokenService = tokenService;
         _emailService = emailService;
+        _walletManager = walletManager;
         _logger = logger;
     }
 
@@ -49,6 +52,8 @@ public class AuthManager : IAuthManager
         var rawVerificationToken = Guid.NewGuid().ToString("N");
         user.EmailVerificationToken = HashToken(rawVerificationToken);
         await _userRepo.AddAsync(user);
+
+        await _walletManager.CreateWalletAsync(user.Id);
 
         var verifyUrl = $"https://saiyad-eg.vercel.app/#/verify-email?token={rawVerificationToken}";
         await _emailService.SendAsync(

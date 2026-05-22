@@ -1,5 +1,6 @@
 ﻿global using Sayiad.Data.Common;
 global using Sayiad.Data.Models;
+global using Sayiad.Data.Configurations;
 global using Sayiad.Data.Repository.AuctionRepo;
 global using Sayiad.Data.Repository.CartRepo;
 global using Sayiad.Data.Repository.CategoryRepo;
@@ -14,3 +15,5 @@ global using Sayiad.Data.Repository.ShippingAddressRepo;
 global using Sayiad.Data.Repository.SubscriptionRepo;
 global using Sayiad.Data.Repository.UserRepo;
 global using Sayiad.Data.Repository.WishlistRepo;
+global using Sayiad.Data.Repository.WalletRepo;
+global using Sayiad.Data.Repository.SubscriptionPlanRepo;

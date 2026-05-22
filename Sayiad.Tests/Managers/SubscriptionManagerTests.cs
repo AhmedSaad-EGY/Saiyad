@@ -8,10 +8,26 @@ public class SubscriptionManagerTests
 {
     private readonly Mock<IUserRepository> _userRepoMock = new();
     private readonly Mock<ISubscriptionRepository> _subRepoMock = new();
+    private readonly Mock<ISubscriptionPlanRepository> _planRepoMock = new();
+    private readonly Mock<IWalletManager> _walletManagerMock = new();
     private readonly Mock<ILogger<SubscriptionManager>> _loggerMock = new();
 
+    private static readonly SubscriptionPlan ProPlan = new()
+    {
+        Id = 1, Tier = SubscriptionTier.Pro, Name = "Pro", Price = 20,
+        MaxAuctionsPerMonth = 25, MaxBidsPerMonth = 50, MaxAuctionRequestsPerMonth = 25,
+        Features = "[]", IsActive = true, SortOrder = 3
+    };
+
+    private static readonly SubscriptionPlan FreePlan = new()
+    {
+        Id = 0, Tier = SubscriptionTier.Free, Name = "Free", Price = 0,
+        MaxAuctionsPerMonth = 3, MaxBidsPerMonth = 3, MaxAuctionRequestsPerMonth = 3,
+        Features = "[]", IsActive = true, SortOrder = 1
+    };
+
     private SubscriptionManager CreateManager() =>
-        new(_userRepoMock.Object, _subRepoMock.Object, _loggerMock.Object);
+        new(_userRepoMock.Object, _subRepoMock.Object, _planRepoMock.Object, _walletManagerMock.Object, _loggerMock.Object);
 
     [Fact]
     public async Task UpgradeAsync_WithValidTier_CreatesSubscription()
@@ -21,6 +37,8 @@ public class SubscriptionManagerTests
         _subRepoMock.Setup(r => r.GetActiveAsync(1)).ReturnsAsync((Subscription?)null);
         _subRepoMock.Setup(r => r.GetMonthlyAuctionCountAsync(1)).ReturnsAsync(0);
         _subRepoMock.Setup(r => r.PaymentReferenceExistsAsync("pay_123")).ReturnsAsync(false);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Pro)).ReturnsAsync(ProPlan);
+        _walletManagerMock.Setup(w => w.HasSufficientBalanceAsync(1, ProPlan.Price)).ReturnsAsync(true);
 
         var manager = CreateManager();
         var result = await manager.UpgradeAsync(1,
@@ -52,6 +70,8 @@ public class SubscriptionManagerTests
         var user = new User { Id = 1, SubscriptionTier = SubscriptionTier.Free };
         _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
         _subRepoMock.Setup(r => r.PaymentReferenceExistsAsync("pay_dup")).ReturnsAsync(true);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Pro)).ReturnsAsync(ProPlan);
+        _walletManagerMock.Setup(w => w.HasSufficientBalanceAsync(1, ProPlan.Price)).ReturnsAsync(true);
 
         var manager = CreateManager();
         var result = await manager.UpgradeAsync(1,
@@ -68,6 +88,7 @@ public class SubscriptionManagerTests
         _userRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(user);
         _subRepoMock.Setup(r => r.GetActiveAsync(1)).ReturnsAsync((Subscription?)null);
         _subRepoMock.Setup(r => r.GetMonthlyAuctionCountAsync(1)).ReturnsAsync(2);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Free)).ReturnsAsync(FreePlan);
 
         var manager = CreateManager();
         var result = await manager.GetMySubscriptionAsync(1);

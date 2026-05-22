@@ -127,4 +127,27 @@ public class ProductRepository : IProductRepository
         _db.ProductImages.Remove(image);
         await _db.SaveChangesAsync();
     }
+
+    public async Task<PagedResult<Product>> GetPendingReviewAsync(PaginationRequest pagination)
+    {
+        var query = _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.Seller)
+            .Where(p => p.DeletedAt == null && p.Status == ProductStatus.PendingReview)
+            .OrderBy(p => p.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<Product>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
 }

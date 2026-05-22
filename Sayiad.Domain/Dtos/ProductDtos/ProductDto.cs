@@ -6,7 +6,8 @@ public record ProductResponse(
     ProductCondition Condition, decimal Price, int StockQuantity,
     string Location, bool IsAuctioned, int? AuctionId, ProductStatus Status,
     int SellerId, string SellerName, int CategoryId, string CategoryName,
-    string? PrimaryImageUrl, DateTime CreatedAt, DateTime UpdatedAt
+    string? PrimaryImageUrl, DateTime CreatedAt, DateTime UpdatedAt,
+    int? ReviewedByUserId = null, DateTime? ReviewedAt = null, string? RejectionReason = null
 );
 
 public record CreateProductRequest(
@@ -24,6 +25,8 @@ public record UpdateProductRequest(
 public record AddProductImageRequest(string ImageUrl, bool IsPrimary);
 
 public record UpdateProductStatusRequest(ProductStatus Status);
+
+public record RejectProductRequest(string Reason);
 
 public record ProductImageResponse(
     int Id,

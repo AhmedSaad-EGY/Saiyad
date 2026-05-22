@@ -13,4 +13,5 @@ public interface IProductRepository
     Task<ProductImage> AddImageAsync(ProductImage image);
     Task<ProductImage?> GetImageByIdAsync(int imageId);
     Task DeleteImageAsync(ProductImage image);
+    Task<PagedResult<Product>> GetPendingReviewAsync(PaginationRequest pagination);
 }

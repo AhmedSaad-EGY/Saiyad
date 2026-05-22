@@ -58,7 +58,7 @@ public class ProductManager : IProductManager
             Price = request.Price,
             StockQuantity = request.StockQuantity,
             Location = InputSanitizer.SanitizeNullable(request.Location),
-            Status = ProductStatus.Available,
+            Status = ProductStatus.PendingReview,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -165,6 +165,58 @@ public class ProductManager : IProductManager
         return products.Select(MapToResponse);
     }
 
+    public async Task<PagedResult<ProductResponse>> GetPendingReviewAsync(PaginationRequest pagination)
+    {
+        var p = pagination ?? new PaginationRequest();
+        var result = await _repo.GetPendingReviewAsync(p);
+        return new PagedResult<ProductResponse>
+        {
+            Items = result.Items.Select(MapToResponse).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        };
+    }
+
+    public async Task<ProductResponse> ApproveProductAsync(int id, int adminId)
+    {
+        var product = await _repo.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        if (product.Status != ProductStatus.PendingReview)
+            throw new InvalidOperationException("Only pending-review products can be approved");
+
+        product.Status = ProductStatus.Available;
+        product.ReviewedByUserId = adminId;
+        product.ReviewedAt = DateTime.UtcNow;
+        product.UpdatedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(product);
+        _logger.LogInformation("Product {ProductId} approved by admin {AdminId}", id, adminId);
+
+        return MapToResponse(product);
+    }
+
+    public async Task<ProductResponse> RejectProductAsync(int id, int adminId, string reason)
+    {
+        var product = await _repo.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        if (product.Status != ProductStatus.PendingReview)
+            throw new InvalidOperationException("Only pending-review products can be rejected");
+
+        product.Status = ProductStatus.Rejected;
+        product.ReviewedByUserId = adminId;
+        product.ReviewedAt = DateTime.UtcNow;
+        product.RejectionReason = reason;
+        product.UpdatedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(product);
+        _logger.LogInformation("Product {ProductId} rejected by admin {AdminId}: {Reason}", id, adminId, reason);
+
+        return MapToResponse(product);
+    }
+
     private static ProductResponse MapToResponse(Product p) => new(
         p.Id, p.Title, p.Description, p.Brand, p.Condition,
         p.Price, p.StockQuantity, p.Location, p.IsAuctioned,
@@ -172,6 +224,7 @@ public class ProductManager : IProductManager
         p.Status, p.SellerId, p.Seller?.FullName ?? string.Empty,
         p.CategoryId, p.Category.Name,
         p.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
-        p.CreatedAt, p.UpdatedAt
+        p.CreatedAt, p.UpdatedAt,
+        p.ReviewedByUserId, p.ReviewedAt, p.RejectionReason
     );
 }

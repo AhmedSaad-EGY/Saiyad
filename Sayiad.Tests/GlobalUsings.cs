@@ -11,6 +11,7 @@ global using Sayiad.Data.Repository.ReportRepo;
 global using Sayiad.Data.Repository.ReviewRepo;
 global using Sayiad.Data.Repository.SellerProfileRepo;
 global using Sayiad.Data.Repository.ShippingAddressRepo;
+global using Sayiad.Data.Repository.SubscriptionPlanRepo;
 global using Sayiad.Data.Repository.SubscriptionRepo;
 global using Sayiad.Domain.Contracts.Subscription;
 global using Sayiad.Domain.Dtos.Subscription;
