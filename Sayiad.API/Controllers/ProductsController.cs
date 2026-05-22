@@ -31,7 +31,7 @@ public class ProductsController : ControllerBase
         return Ok(product);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateProductRequest request)
     {
@@ -40,7 +40,7 @@ public class ProductsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateProductRequest request)
     {
@@ -49,7 +49,7 @@ public class ProductsController : ControllerBase
         return Ok(product);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -58,7 +58,7 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpGet("my")]
     public async Task<IActionResult> GetMyProducts()
     {
@@ -67,7 +67,7 @@ public class ProductsController : ControllerBase
         return Ok(products);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpPost("{id}/images")]
     public async Task<IActionResult> AddImage(int id, [FromBody] AddProductImageRequest request)
     {
@@ -76,13 +76,39 @@ public class ProductsController : ControllerBase
         return Created("", result);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpDelete("{id}/images/{imageId}")]
     public async Task<IActionResult> DeleteImage(int id, int imageId)
     {
         var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         await _productManager.DeleteImageAsync(id, imageId, sellerId);
         return NoContent();
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpGet("pending-review")]
+    public async Task<IActionResult> GetPendingReview([FromQuery] PaginationRequest? pagination)
+    {
+        var products = await _productManager.GetPendingReviewAsync(pagination ?? new PaginationRequest());
+        return Ok(products);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPatch("{id}/approve")]
+    public async Task<IActionResult> Approve(int id)
+    {
+        var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var product = await _productManager.ApproveProductAsync(id, adminId);
+        return Ok(product);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPatch("{id}/reject")]
+    public async Task<IActionResult> Reject(int id, [FromBody] RejectProductRequest request)
+    {
+        var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var product = await _productManager.RejectProductAsync(id, adminId, request.Reason);
+        return Ok(product);
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]

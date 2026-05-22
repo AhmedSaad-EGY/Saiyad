@@ -31,7 +31,7 @@ public class ReviewsController : ControllerBase
         return Ok(rating);
     }
 
-    [Authorize]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateReviewRequest request)
     {
@@ -40,7 +40,7 @@ public class ReviewsController : ControllerBase
         return CreatedAtAction(nameof(GetProductReviews), new { productId = request.ProductId }, review);
     }
 
-    [Authorize]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

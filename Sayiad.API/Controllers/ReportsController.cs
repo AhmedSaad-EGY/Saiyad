@@ -16,7 +16,7 @@ public class ReportsController : ControllerBase
         _reportManager = reportManager;
     }
 
-    [Authorize]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateReportRequest request)
     {

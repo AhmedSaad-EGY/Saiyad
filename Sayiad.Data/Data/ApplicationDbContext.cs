@@ -25,12 +25,17 @@
         public DbSet<SellerProfile> SellerProfiles { get; set; } = null!;
         public DbSet<Subscription> Subscriptions { get; set; } = null!;
         public DbSet<AuctionRequest> AuctionRequests { get; set; } = null!;
-
+        public DbSet<Wallet> Wallets { get; set; } = null!;
+        public DbSet<WalletTransaction> WalletTransactions { get; set; } = null!;
+        public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
             modelBuilder.ApplyConfiguration(new AuctionRequestConfiguration());
+            modelBuilder.ApplyConfiguration(new WalletConfiguration());
+            modelBuilder.ApplyConfiguration(new WalletTransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
 
             // Fix decimal precision warnings
             modelBuilder.Entity<Bid>(b =>

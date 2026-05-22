@@ -7,7 +7,7 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
 public class OrdersController : ControllerBase
 {
     private readonly IOrderManager _orderManager;

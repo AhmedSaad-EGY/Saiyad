@@ -39,7 +39,7 @@ public class AuctionsController : ControllerBase
         return Ok(auction);
     }
 
-    [Authorize(Roles = nameof(UserRole.Auctioneer))]
+    [Authorize(Roles = $"{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateAuctionRequest request)
     {
@@ -52,7 +52,7 @@ public class AuctionsController : ControllerBase
     /// Places a bid on an active auction. Supports optional auto-bid via MaxAutoBidAmount.
     /// Broadcasts the bid to all connected SignalR clients in the auction group.
     /// </summary>
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Admin)}")]
+    [Authorize(Roles = nameof(UserRole.Customer))]
     [HttpPost("{id}/bids")]
     public async Task<IActionResult> PlaceBid(int id, PlaceBidRequest request)
     {
@@ -94,7 +94,7 @@ public class AuctionsController : ControllerBase
 
     // ── AUCTIONEER: Review auction requests ───────────────────────
 
-    [Authorize(Roles = nameof(UserRole.Auctioneer))]
+    [Authorize(Roles = $"{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpGet("requests/pending")]
     public async Task<IActionResult> GetPendingRequests([FromQuery] PaginationRequest? pagination)
     {
@@ -102,7 +102,7 @@ public class AuctionsController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize(Roles = nameof(UserRole.Auctioneer))]
+    [Authorize(Roles = $"{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpPost("requests/{id}/approve")]
     public async Task<IActionResult> ApproveRequest(int id, ApproveAuctionRequestRequest request)
     {
@@ -111,7 +111,7 @@ public class AuctionsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = auction.Id }, auction);
     }
 
-    [Authorize(Roles = nameof(UserRole.Auctioneer))]
+    [Authorize(Roles = $"{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpPost("requests/{id}/reject")]
     public async Task<IActionResult> RejectRequest(int id, RejectAuctionRequestRequest request)
     {

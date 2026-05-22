@@ -5,5 +5,6 @@ namespace Sayiad.Data.Models;
         Sold,
         Draft,
         Rejected,
-        Suspended
+        Suspended,
+        PendingReview
     }

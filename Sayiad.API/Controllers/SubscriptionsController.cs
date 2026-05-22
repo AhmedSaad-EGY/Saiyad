@@ -8,7 +8,6 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class SubscriptionsController : ControllerBase
 {
     private readonly ISubscriptionManager _subscriptionManager;
@@ -18,6 +17,7 @@ public class SubscriptionsController : ControllerBase
         _subscriptionManager = subscriptionManager;
     }
 
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
     [HttpPost("upgrade")]
     public async Task<IActionResult> Upgrade(UpgradeSubscriptionRequest request)
     {
@@ -30,6 +30,7 @@ public class SubscriptionsController : ControllerBase
         return Ok(result.Data);
     }
 
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
     [HttpGet("my")]
     public async Task<IActionResult> GetMySubscription()
     {

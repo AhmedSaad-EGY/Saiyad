@@ -105,6 +105,10 @@ try
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
     builder.Services.AddScoped<ISubscriptionManager, SubscriptionManager>();
+    builder.Services.AddScoped<IWalletRepository, WalletRepository>();
+    builder.Services.AddScoped<IWalletManager, WalletManager>();
+    builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+    builder.Services.AddScoped<ISubscriptionPlanManager, SubscriptionPlanManager>();
 
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
@@ -143,6 +147,28 @@ try
         {
             Log.Warning(ex, "Failed to apply database migrations. App will continue but some features may not work.");
         }
+    }
+
+    // Ensure admin user has a wallet (platform wallet for fees)
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var walletManager = scope.ServiceProvider.GetRequiredService<IWalletManager>();
+        var admin = await userRepo.GetByEmailAsync("sayiadapp@gmail.com");
+        if (admin != null)
+        {
+            await walletManager.CreateWalletAsync(admin.Id);
+            Log.Information("Admin wallet ensured for {Email}", admin.Email);
+        }
+        else
+        {
+            Log.Warning("Admin user {Email} not found — platform wallet not created", "sayiadapp@gmail.com");
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to ensure admin wallet on startup");
     }
 
     app.UseSerilogRequestLogging();

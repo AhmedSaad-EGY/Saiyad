@@ -34,4 +34,5 @@ namespace Sayiad.Data.Models;
         public ICollection<Auction> WonAuctions { get; set; } = new List<Auction>();
         public ICollection<OrderItem> SoldOrderItems { get; set; } = new List<OrderItem>();
         public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
+        public Wallet? Wallet { get; set; }
     }

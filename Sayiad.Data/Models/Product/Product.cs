@@ -16,6 +16,9 @@ namespace Sayiad.Data.Models;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? DeletedAt { get; set; }
+        public int? ReviewedByUserId { get; set; }
+        public DateTime? ReviewedAt { get; set; }
+        public string? RejectionReason { get; set; }
 
         public User Seller { get; set; } = null!;
         public Category Category { get; set; } = null!;

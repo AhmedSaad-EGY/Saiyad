@@ -84,6 +84,24 @@ public class AuctionRepository : IAuctionRepository
             .CountAsync(a => a.CreatedByUserId == userId && a.CreatedAt >= startOfMonth);
     }
 
+    public async Task<int> GetUserMonthlyBidCountAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        return await _db.Bids
+            .CountAsync(b => b.UserId == userId && b.CreatedAt >= startOfMonth);
+    }
+
+    public async Task<int> GetUserMonthlyRequestCountAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        return await _db.AuctionRequests
+            .CountAsync(r => r.FishermanId == userId && r.CreatedAt >= startOfMonth);
+    }
+
     public async Task<List<Auction>> GetExpiredActiveAsync()
     {
         return await _db.Auctions
