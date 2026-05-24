@@ -56,4 +56,13 @@ public class UsersController : ControllerBase
         await _userManager.ToggleUserStatusAsync(id);
         return NoContent();
     }
+
+    [Authorize]
+    [HttpGet("~/api/user")]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _userManager.GetProfileAsync(userId);
+        return Ok(result);
+    }
 }
