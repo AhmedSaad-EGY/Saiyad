@@ -195,8 +195,13 @@ public class WalletManager : IWalletManager
 
     public async Task CreditSellerAsync(int sellerId, decimal amount, int orderId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(sellerId)
-            ?? throw new KeyNotFoundException("Seller wallet not found");
+        var wallet = await _walletRepo.GetByUserIdAsync(sellerId);
+        if (wallet == null)
+        {
+            await CreateWalletAsync(sellerId);
+            wallet = await _walletRepo.GetByUserIdAsync(sellerId)
+                ?? throw new KeyNotFoundException("Failed to create seller wallet");
+        }
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
@@ -275,8 +280,13 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Fee amount must be positive");
 
-        var wallet = await _walletRepo.GetByUserIdAsync(platformUserId)
-            ?? throw new KeyNotFoundException("Platform wallet not found");
+        var wallet = await _walletRepo.GetByUserIdAsync(platformUserId);
+        if (wallet == null)
+        {
+            await CreateWalletAsync(platformUserId);
+            wallet = await _walletRepo.GetByUserIdAsync(platformUserId)
+                ?? throw new KeyNotFoundException("Failed to create platform wallet");
+        }
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
