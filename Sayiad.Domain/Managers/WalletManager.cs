@@ -19,8 +19,13 @@ public class WalletManager : IWalletManager
 
     public async Task<WalletResponse> GetWalletAsync(int userId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
-            ?? throw new KeyNotFoundException("Wallet not found");
+        var wallet = await _walletRepo.GetByUserIdAsync(userId);
+        if (wallet == null)
+        {
+            await CreateWalletAsync(userId);
+            wallet = await _walletRepo.GetByUserIdAsync(userId)
+                ?? throw new KeyNotFoundException("Failed to create wallet");
+        }
         return MapWallet(wallet);
     }
 
