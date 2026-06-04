@@ -18,6 +18,7 @@ public class ProductRepository : IProductRepository
     {
         var query = _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available)
             .AsQueryable();
 
@@ -78,6 +79,7 @@ public class ProductRepository : IProductRepository
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null);
     }
 
@@ -85,6 +87,7 @@ public class ProductRepository : IProductRepository
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .Where(p => p.SellerId == sellerId && p.DeletedAt == null)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
