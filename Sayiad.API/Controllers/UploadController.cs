@@ -28,17 +28,21 @@ public class UploadController : ControllerBase
         if (!AllowedExtensions.Contains(ext))
             return BadRequest("Only jpg, jpeg, png, webp files are allowed");
 
-        if (!IsValidImageBytes(file))
+        using var memoryStream = new MemoryStream();
+        await file.CopyToAsync(memoryStream);
+        memoryStream.Position = 0;
+
+        if (!IsValidImageBytes(memoryStream))
             return BadRequest("File content does not match a valid image format.");
 
-        await using var stream = file.OpenReadStream();
-        var url = await _fileStorage.UploadAsync(stream, file.FileName, "sayiad/products");
+        memoryStream.Position = 0;
+        var url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/products");
         return Ok(new { url });
     }
 
-    private static bool IsValidImageBytes(IFormFile file)
+    private static bool IsValidImageBytes(Stream stream)
     {
-        using var reader = new BinaryReader(file.OpenReadStream());
+        using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
         var bytes = reader.ReadBytes(4);
 
         // JPEG: FF D8 FF
