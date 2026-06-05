@@ -17,7 +17,7 @@ public class SubscriptionsController : ControllerBase
         _subscriptionManager = subscriptionManager;
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpPost("upgrade")]
     public async Task<IActionResult> Upgrade(UpgradeSubscriptionRequest request)
     {
@@ -30,7 +30,7 @@ public class SubscriptionsController : ControllerBase
         return Ok(result.Data);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpGet("my")]
     public async Task<IActionResult> GetMySubscription()
     {
