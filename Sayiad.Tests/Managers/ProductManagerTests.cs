@@ -10,8 +10,10 @@ public class ProductManagerTests
     private readonly Mock<ICategoryRepository> _categoryRepoMock = new();
     private readonly Mock<ILogger<ProductManager>> _loggerMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
+    private readonly Mock<INotificationManager> _notifMock = new();
+    private readonly Mock<IUserRepository> _userRepoMock = new();
     private ProductManager CreateManager() =>
-        new(_repoMock.Object, _categoryRepoMock.Object, _loggerMock.Object, _walletManagerMock.Object);
+        new(_repoMock.Object, _categoryRepoMock.Object, _loggerMock.Object, _walletManagerMock.Object, _notifMock.Object, _userRepoMock.Object);
 
     [Fact]
     public async Task Update_ByNonOwner_ThrowsUnauthorizedAccessException()

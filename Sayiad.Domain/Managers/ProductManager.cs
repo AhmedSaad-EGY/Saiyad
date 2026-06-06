@@ -11,17 +11,23 @@ public class ProductManager : IProductManager
     private readonly ICategoryRepository _categoryRepo;
     private readonly ILogger<ProductManager> _logger;
     private readonly IWalletManager _walletManager;
+    private readonly INotificationManager _notificationManager;
+    private readonly IUserRepository _userRepo;
 
     public ProductManager(
         IProductRepository repo,
         ICategoryRepository categoryRepo,
         ILogger<ProductManager> logger,
-        IWalletManager walletManager)
+        IWalletManager walletManager,
+        INotificationManager notificationManager,
+        IUserRepository userRepo)
     {
         _repo = repo;
         _categoryRepo = categoryRepo;
         _logger = logger;
         _walletManager = walletManager;
+        _notificationManager = notificationManager;
+        _userRepo = userRepo;
     }
 
     public async Task<PagedResult<ProductResponse>> GetAllAsync(ProductFilterRequest? filter = null, PaginationRequest? pagination = null)
@@ -75,6 +81,14 @@ public class ProductManager : IProductManager
         _logger.LogInformation(
             "Product created: {ProductId} by seller {SellerId}, held {HoldAmount} EGP",
             product.Id, sellerId, holdAmount);
+
+        // Notify all admins about new product pending review
+        var admins = await _userRepo.GetUsersByRoleAsync(UserRole.Admin);
+        foreach (var admin in admins)
+        {
+            await _notificationManager.CreateAsync(admin.Id, "New Product Review",
+                $"Product '{product.Title}' needs your review.");
+        }
 
         return await GetByIdAsync(product.Id);
     }
@@ -222,6 +236,10 @@ public class ProductManager : IProductManager
         await _repo.UpdateAsync(product);
         _logger.LogInformation("Product {ProductId} approved by admin {AdminId}", id, adminId);
 
+        // Notify seller their product was approved
+        await _notificationManager.CreateAsync(product.SellerId, "Product Approved",
+            $"Your product '{product.Title}' has been approved and is now live.");
+
         return MapToResponse(product);
     }
 
@@ -247,6 +265,10 @@ public class ProductManager : IProductManager
         _logger.LogInformation(
             "Product {ProductId} rejected by admin {AdminId}: {Reason}, hold {HoldAmount} EGP released",
             id, adminId, reason, holdAmount);
+
+        // Notify seller their product was rejected
+        await _notificationManager.CreateAsync(product.SellerId, "Product Rejected",
+            $"Your product '{product.Title}' has been rejected. Reason: {reason}");
 
         return MapToResponse(product);
     }
