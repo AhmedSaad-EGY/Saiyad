@@ -30,7 +30,8 @@ public class UserManager : IUserManager
 
         user.FullName = InputSanitizer.Sanitize(request.FullName);
         user.Phone = request.Phone;
-        user.ProfileImage = request.ProfileImage;
+        if (request.ProfileImage != null)
+            user.ProfileImage = request.ProfileImage;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _userRepo.UpdateAsync(user);
