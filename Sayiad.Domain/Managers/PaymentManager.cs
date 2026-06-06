@@ -119,6 +119,14 @@ public class PaymentManager : IPaymentManager
                 await _walletManager.CreditSellerAsync(sellerGroup.Key, sellerAmount, order.Id);
                 if (adminId.HasValue)
                     await _walletManager.CreditPlatformFeeAsync(adminId.Value, fee, "Order", order.Id);
+
+                // Release the 5% product listing hold on each sold item (one hold per product)
+                foreach (var productGroup in sellerGroup.GroupBy(i => i.ProductId))
+                {
+                    var first = productGroup.First();
+                    var holdAmount = first.UnitPrice * 0.05m;
+                    await _walletManager.ReleaseHeldFundsAsync(first.SellerId, holdAmount, "Product", productGroup.Key);
+                }
             }
         }
 

@@ -111,7 +111,7 @@ try
     builder.Services.AddScoped<ISubscriptionPlanManager, SubscriptionPlanManager>();
 
     builder.Services.AddScoped<ITokenService, TokenService>();
-    builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
+    builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     builder.Services.AddScoped<IEmailService, SmtpEmailService>();
     builder.Services.AddScoped<IAuthManager, AuthManager>();
     builder.Services.AddScoped<IUserManager, UserManager>();
