@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Sayiad.Domain.Common;
+using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Dtos.UserDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -7,11 +8,13 @@ namespace Sayiad.Domain.Managers;
 public class UserManager : IUserManager
 {
     private readonly IUserRepository _userRepo;
+    private readonly IFileStorageService _fileStorage;
     private readonly ILogger<UserManager> _logger;
 
-    public UserManager(IUserRepository userRepo, ILogger<UserManager> logger)
+    public UserManager(IUserRepository userRepo, IFileStorageService fileStorage, ILogger<UserManager> logger)
     {
         _userRepo = userRepo;
+        _fileStorage = fileStorage;
         _logger = logger;
     }
 
@@ -38,6 +41,21 @@ public class UserManager : IUserManager
         _logger.LogInformation("Profile updated for user {UserId}", userId);
 
         return MapToProfileResponse(user);
+    }
+
+    public async Task DeleteProfileImageAsync(int userId)
+    {
+        var user = await _userRepo.GetByIdAsync(userId)
+            ?? throw new KeyNotFoundException("User not found");
+
+        if (!string.IsNullOrEmpty(user.ProfileImage))
+            await _fileStorage.DeleteAsync(user.ProfileImage);
+
+        user.ProfileImage = null;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userRepo.UpdateAsync(user);
+
+        _logger.LogInformation("Profile image deleted for user {UserId}", userId);
     }
 
     public async Task<PagedResult<UserAdminResponse>> GetAllUsersAsync(PaginationRequest? pagination = null)

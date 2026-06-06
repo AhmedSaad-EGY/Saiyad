@@ -33,6 +33,15 @@ public class UsersController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize]
+    [HttpDelete("profile/image")]
+    public async Task<IActionResult> DeleteProfileImage()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        await _userManager.DeleteProfileImageAsync(userId);
+        return Ok(new { message = "Profile image removed" });
+    }
+
     [Authorize(Roles = nameof(UserRole.Admin))]
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] PaginationRequest? pagination)
