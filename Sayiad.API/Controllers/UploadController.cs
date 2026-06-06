@@ -18,34 +18,33 @@ public class UploadController : ControllerBase
     [RequestSizeLimit(5 * 1024 * 1024)]
     public async Task<IActionResult> Upload(IFormFile file)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
-
-        if (file.Length > MaxFileSize)
-            return BadRequest("File size exceeds 5 MB limit");
-
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(ext))
-            return BadRequest("Only jpg, jpeg, png, webp files are allowed");
-
-        using var memoryStream = new MemoryStream();
-        await file.CopyToAsync(memoryStream);
-        memoryStream.Position = 0;
-
-        if (!IsValidImageBytes(memoryStream))
-            return BadRequest("File content does not match a valid image format.");
-
-        memoryStream.Position = 0;
-        string url;
         try
         {
-            url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/profiles");
+            if (file == null || file.Length == 0)
+                return BadRequest("No file provided");
+
+            if (file.Length > MaxFileSize)
+                return BadRequest("File size exceeds 5 MB limit");
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedExtensions.Contains(ext))
+                return BadRequest("Only jpg, jpeg, png, webp files are allowed");
+
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            if (!IsValidImageBytes(memoryStream))
+                return BadRequest("File content does not match a valid image format.");
+
+            memoryStream.Position = 0;
+            var url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/profiles");
+            return Ok(new { url });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = "Image upload failed. Please try again." });
+            return StatusCode(500, new { message = "Image upload failed. Please try again." });
         }
-        return Ok(new { url });
     }
 
     private static bool IsValidImageBytes(Stream stream)

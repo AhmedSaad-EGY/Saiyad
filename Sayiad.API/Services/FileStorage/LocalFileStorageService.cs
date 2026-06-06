@@ -5,15 +5,20 @@ namespace Sayiad.Api.Services.FileStorage;
 public class LocalFileStorageService : IFileStorageService
 {
     private readonly string _basePath;
+    private bool _dirCreated;
 
     public LocalFileStorageService(IWebHostEnvironment env)
     {
         _basePath = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-        Directory.CreateDirectory(_basePath);
     }
 
     public async Task<string> UploadAsync(Stream fileStream, string fileName, string folder)
     {
+        if (!_dirCreated)
+        {
+            Directory.CreateDirectory(_basePath);
+            _dirCreated = true;
+        }
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
         var uniqueName = $"{Guid.NewGuid()}{ext}";
         var relative = Path.Combine("uploads", folder, uniqueName);
