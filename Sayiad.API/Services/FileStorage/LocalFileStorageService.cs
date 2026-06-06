@@ -19,20 +19,23 @@ public class LocalFileStorageService : IFileStorageService
             Directory.CreateDirectory(_basePath);
             _dirCreated = true;
         }
+        var flatFolder = folder.Replace('/', '_');
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
         var uniqueName = $"{Guid.NewGuid()}{ext}";
-        var relative = Path.Combine("uploads", folder, uniqueName);
+        var relative = Path.Combine("uploads", flatFolder, uniqueName);
         var dir = Path.Combine(_basePath, Path.GetDirectoryName(relative)!);
         Directory.CreateDirectory(dir);
         var path = Path.Combine(_basePath, relative);
         await using var fs = new FileStream(path, FileMode.Create);
         await fileStream.CopyToAsync(fs);
-        return $"/api/images/{folder}/{uniqueName}";
+        return $"/api/images/{flatFolder}/{uniqueName}";
     }
 
     public Task DeleteAsync(string url)
     {
-        var path = Path.Combine(_basePath, url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+        // url = /api/images/{folder}/{fileName}, convert to uploads/{folder}/{fileName}
+        var relative = "uploads" + url["/api/images".Length..];
+        var path = Path.Combine(_basePath, relative.TrimStart('/'));
         if (File.Exists(path)) File.Delete(path);
         return Task.CompletedTask;
     }
