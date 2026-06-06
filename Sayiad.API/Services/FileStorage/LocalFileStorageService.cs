@@ -27,7 +27,7 @@ public class LocalFileStorageService : IFileStorageService
         var path = Path.Combine(_basePath, relative);
         await using var fs = new FileStream(path, FileMode.Create);
         await fileStream.CopyToAsync(fs);
-        return $"/{relative.Replace('\\', '/')}";
+        return $"/api/images/{folder}/{uniqueName}";
     }
 
     public Task DeleteAsync(string url)
