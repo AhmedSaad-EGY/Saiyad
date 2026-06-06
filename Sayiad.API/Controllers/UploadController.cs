@@ -36,7 +36,15 @@ public class UploadController : ControllerBase
             return BadRequest("File content does not match a valid image format.");
 
         memoryStream.Position = 0;
-        var url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/products");
+        string url;
+        try
+        {
+            url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/profiles");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Image upload failed. Please try again." });
+        }
         return Ok(new { url });
     }
 
