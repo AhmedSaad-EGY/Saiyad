@@ -18,7 +18,7 @@ try
         options.HeaderName = "X-CSRF-Token";
         options.Cookie.Name = "XSRF-TOKEN";
         options.Cookie.HttpOnly = false;
-        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SameSite = SameSiteMode.None;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
 
