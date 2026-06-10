@@ -10,15 +10,24 @@ public class ProductManager : IProductManager
     private readonly IProductRepository _repo;
     private readonly ICategoryRepository _categoryRepo;
     private readonly ILogger<ProductManager> _logger;
+    private readonly IWalletManager _walletManager;
+    private readonly INotificationManager _notificationManager;
+    private readonly IUserRepository _userRepo;
 
     public ProductManager(
         IProductRepository repo,
         ICategoryRepository categoryRepo,
-        ILogger<ProductManager> logger)
+        ILogger<ProductManager> logger,
+        IWalletManager walletManager,
+        INotificationManager notificationManager,
+        IUserRepository userRepo)
     {
         _repo = repo;
         _categoryRepo = categoryRepo;
         _logger = logger;
+        _walletManager = walletManager;
+        _notificationManager = notificationManager;
+        _userRepo = userRepo;
     }
 
     public async Task<PagedResult<ProductResponse>> GetAllAsync(ProductFilterRequest? filter = null, PaginationRequest? pagination = null)
@@ -53,18 +62,33 @@ public class ProductManager : IProductManager
             CategoryId = request.CategoryId,
             Title = InputSanitizer.Sanitize(request.Title),
             Description = InputSanitizer.Sanitize(request.Description),
-            Brand = InputSanitizer.SanitizeNullable(request.Brand),
+            Brand = InputSanitizer.SanitizeNullable(request.Brand) ?? string.Empty,
             Condition = request.Condition,
             Price = request.Price,
             StockQuantity = request.StockQuantity,
-            Location = InputSanitizer.SanitizeNullable(request.Location),
+            Location = InputSanitizer.SanitizeNullable(request.Location) ?? string.Empty,
             Status = ProductStatus.PendingReview,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         await _repo.AddAsync(product);
-        _logger.LogInformation("Product created: {ProductId} by seller {SellerId}", product.Id, sellerId);
+
+        // Hold 5% of the product price as security deposit
+        var holdAmount = request.Price * 0.05m;
+        await _walletManager.HoldFundsAsync(sellerId, holdAmount, "Product", product.Id);
+
+        _logger.LogInformation(
+            "Product created: {ProductId} by seller {SellerId}, held {HoldAmount} EGP",
+            product.Id, sellerId, holdAmount);
+
+        // Notify all admins about new product pending review
+        var admins = await _userRepo.GetUsersByRoleAsync(UserRole.Admin);
+        foreach (var admin in admins)
+        {
+            await _notificationManager.CreateAsync(admin.Id, "New Product Review",
+                $"Product '{product.Title}' needs your review.");
+        }
 
         return await GetByIdAsync(product.Id);
     }
@@ -77,13 +101,25 @@ public class ProductManager : IProductManager
         if (product.SellerId != sellerId)
             throw new UnauthorizedAccessException("You can only edit your own products");
 
+        // Adjust held balance when price changes
+        var oldHold = product.Price * 0.05m;
+        var newHold = request.Price * 0.05m;
+        if (newHold > oldHold)
+        {
+            await _walletManager.HoldFundsAsync(sellerId, newHold - oldHold, "Product", id);
+        }
+        else if (oldHold > newHold)
+        {
+            await _walletManager.ReleaseHeldFundsAsync(sellerId, oldHold - newHold, "Product", id);
+        }
+
         product.Title = InputSanitizer.Sanitize(request.Title);
         product.Description = InputSanitizer.Sanitize(request.Description);
-        product.Brand = InputSanitizer.SanitizeNullable(request.Brand);
+        product.Brand = InputSanitizer.SanitizeNullable(request.Brand) ?? string.Empty;
         product.Condition = request.Condition;
         product.Price = request.Price;
         product.StockQuantity = request.StockQuantity;
-        product.Location = InputSanitizer.SanitizeNullable(request.Location);
+        product.Location = InputSanitizer.SanitizeNullable(request.Location) ?? string.Empty;
         product.CategoryId = request.CategoryId;
         product.Status = request.Status;
         product.UpdatedAt = DateTime.UtcNow;
@@ -102,9 +138,15 @@ public class ProductManager : IProductManager
         if (product.SellerId != sellerId)
             throw new UnauthorizedAccessException("You can only delete your own products");
 
+        // Release the 5% held balance
+        var holdAmount = product.Price * 0.05m;
+        await _walletManager.ReleaseHeldFundsAsync(sellerId, holdAmount, "Product", id);
+
         product.DeletedAt = DateTime.UtcNow;
         await _repo.UpdateAsync(product);
-        _logger.LogInformation("Product deleted (soft): {ProductId}", id);
+        _logger.LogInformation(
+            "Product deleted (soft) and hold released: {ProductId}, {HoldAmount} EGP",
+            id, holdAmount);
     }
 
     public async Task<ProductImageResponse> AddImageAsync(
@@ -194,6 +236,10 @@ public class ProductManager : IProductManager
         await _repo.UpdateAsync(product);
         _logger.LogInformation("Product {ProductId} approved by admin {AdminId}", id, adminId);
 
+        // Notify seller their product was approved
+        await _notificationManager.CreateAsync(product.SellerId, "Product Approved",
+            $"Your product '{product.Title}' has been approved and is now live.");
+
         return MapToResponse(product);
     }
 
@@ -211,8 +257,18 @@ public class ProductManager : IProductManager
         product.RejectionReason = reason;
         product.UpdatedAt = DateTime.UtcNow;
 
+        // Release the 5% held balance when product is rejected
+        var holdAmount = product.Price * 0.05m;
+        await _walletManager.ReleaseHeldFundsAsync(product.SellerId, holdAmount, "Product", id);
+
         await _repo.UpdateAsync(product);
-        _logger.LogInformation("Product {ProductId} rejected by admin {AdminId}: {Reason}", id, adminId, reason);
+        _logger.LogInformation(
+            "Product {ProductId} rejected by admin {AdminId}: {Reason}, hold {HoldAmount} EGP released",
+            id, adminId, reason, holdAmount);
+
+        // Notify seller their product was rejected
+        await _notificationManager.CreateAsync(product.SellerId, "Product Rejected",
+            $"Your product '{product.Title}' has been rejected. Reason: {reason}");
 
         return MapToResponse(product);
     }

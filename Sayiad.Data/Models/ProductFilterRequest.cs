@@ -8,6 +8,8 @@ public record ProductFilterRequest(
     string? Location,
     string? SearchTerm,
     bool? InStock = null,
+    bool? IsAuctioned = null,
+    int? SellerId = null,
     string? SortBy = null,
     string? SortDirection = null
 );

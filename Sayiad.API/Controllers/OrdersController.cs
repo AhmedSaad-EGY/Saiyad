@@ -2,19 +2,22 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sayiad.Domain.Dtos.OrderDtos;
+using Sayiad.Domain.Dtos.PaymentDtos;
 
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+    [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
 public class OrdersController : ControllerBase
 {
     private readonly IOrderManager _orderManager;
+    private readonly IPaymentManager _paymentManager;
 
-    public OrdersController(IOrderManager orderManager)
+    public OrdersController(IOrderManager orderManager, IPaymentManager paymentManager)
     {
         _orderManager = orderManager;
+        _paymentManager = paymentManager;
     }
 
     [HttpPost]
@@ -63,5 +66,27 @@ public class OrdersController : ControllerBase
     {
         var order = await _orderManager.UpdateStatusAsync(id, request.Status);
         return Ok(order);
+    }
+
+    /// <summary>
+    /// Single atomic checkout: creates order + initiates + confirms payment in one request.
+    /// Eliminates the 3-step frontend chain that could leave orders in a partial state.
+    /// </summary>
+    [HttpPost("checkout")]
+    public async Task<IActionResult> Checkout(CheckoutRequest request)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        // 1. Create order from cart
+        var createRequest = new CreateOrderRequest(request.ShippingAddressId);
+        var order = await _orderManager.CreateFromCartAsync(userId, createRequest);
+
+        // 2. Initiate payment
+        var payment = await _paymentManager.InitiateAsync(userId, new InitiatePaymentRequest(order.Id, request.PaymentMethod));
+
+        // 3. Confirm payment (handles wallet deduction, seller credit, platform fee)
+        await _paymentManager.ConfirmAsync(payment.Id, userId);
+
+        return Ok(new CheckoutResponse(order.Id, "Confirmed", order.TotalPrice));
     }
 }

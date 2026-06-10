@@ -20,7 +20,7 @@ public class InputSanitizationMiddleware
             {
                 form[key] = SanitizeValue(context.Request.Form[key]);
             }
-            var formCollection = new FormCollection(form);
+            var formCollection = new FormCollection(form, context.Request.Form.Files);
             context.Request.Form = formCollection;
         }
 

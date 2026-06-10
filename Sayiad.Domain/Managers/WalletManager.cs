@@ -19,8 +19,7 @@ public class WalletManager : IWalletManager
 
     public async Task<WalletResponse> GetWalletAsync(int userId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
-            ?? throw new KeyNotFoundException("Wallet not found");
+        var wallet = await GetOrCreateWalletAsync(userId);
         return MapWallet(wallet);
     }
 
@@ -190,8 +189,9 @@ public class WalletManager : IWalletManager
 
     public async Task CreditSellerAsync(int sellerId, decimal amount, int orderId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(sellerId)
-            ?? throw new KeyNotFoundException("Seller wallet not found");
+        if (amount <= 0) throw new InvalidOperationException("Seller credit amount must be positive");
+
+        var wallet = await GetOrCreateWalletAsync(sellerId);
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
@@ -270,8 +270,7 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Fee amount must be positive");
 
-        var wallet = await _walletRepo.GetByUserIdAsync(platformUserId)
-            ?? throw new KeyNotFoundException("Platform wallet not found");
+        var wallet = await GetOrCreateWalletAsync(platformUserId);
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
@@ -352,7 +351,19 @@ public class WalletManager : IWalletManager
         return wallet.AvailableBalance >= amount;
     }
 
-    public async Task CreateWalletAsync(int userId)
+        private async Task<Wallet> GetOrCreateWalletAsync(int userId)
+    {
+        var wallet = await _walletRepo.GetByUserIdAsync(userId);
+        if (wallet == null)
+        {
+            await CreateWalletAsync(userId);
+            wallet = await _walletRepo.GetByUserIdAsync(userId)
+                ?? throw new KeyNotFoundException($"Failed to create wallet for user {userId}");
+        }
+        return wallet;
+    }
+
+public async Task CreateWalletAsync(int userId)
     {
         var existing = await _walletRepo.GetByUserIdAsync(userId);
         if (existing != null) return;

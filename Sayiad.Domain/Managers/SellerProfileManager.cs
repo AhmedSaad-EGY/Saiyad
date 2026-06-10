@@ -35,7 +35,9 @@ public class SellerProfileManager : ISellerProfileManager
             CreatedAt = DateTime.UtcNow
         };
 
-        var created = await _repo.CreateAsync(profile);
+        await _repo.CreateAsync(profile);
+        var created = await _repo.GetByUserIdAsync(userId)
+            ?? throw new InvalidOperationException("Failed to retrieve created profile");
         return MapToResponse(created);
     }
 

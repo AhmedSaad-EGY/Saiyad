@@ -13,6 +13,15 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddOpenApi();
 
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-CSRF-Token";
+        options.Cookie.Name = "XSRF-TOKEN";
+        options.Cookie.HttpOnly = false;
+        options.Cookie.SameSite = SameSiteMode.None;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
+
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("Dev")));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -111,7 +120,7 @@ try
     builder.Services.AddScoped<ISubscriptionPlanManager, SubscriptionPlanManager>();
 
     builder.Services.AddScoped<ITokenService, TokenService>();
-    builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
+    builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
     builder.Services.AddScoped<IEmailService, SmtpEmailService>();
     builder.Services.AddScoped<IAuthManager, AuthManager>();
     builder.Services.AddScoped<IUserManager, UserManager>();
@@ -122,6 +131,7 @@ try
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         });
     builder.Services.AddHealthChecks()
         .AddSqlServer(
@@ -130,6 +140,7 @@ try
             tags: ["db", "sql"]);
     builder.Services.AddHostedService<AuctionExpiryService>();
     builder.Services.AddTransient<Sayiad.Api.Middleware.ExceptionMiddleware>();
+    builder.Services.AddTransient<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
 
     var app = builder.Build();
 
@@ -188,6 +199,7 @@ try
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
     app.MapControllers();
     app.MapHealthChecks("/health");
     app.MapHub<AuctionHub>("/hubs/auction");

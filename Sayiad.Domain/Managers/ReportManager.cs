@@ -8,15 +8,21 @@ public class ReportManager : IReportManager
     private readonly IReportRepository _repo;
     private readonly IProductRepository _productRepo;
     private readonly ILogger<ReportManager> _logger;
+    private readonly INotificationManager _notificationManager;
+    private readonly IUserRepository _userRepo;
 
     public ReportManager(
         IReportRepository repo,
         IProductRepository productRepo,
-        ILogger<ReportManager> logger)
+        ILogger<ReportManager> logger,
+        INotificationManager notificationManager,
+        IUserRepository userRepo)
     {
         _repo = repo;
         _productRepo = productRepo;
         _logger = logger;
+        _notificationManager = notificationManager;
+        _userRepo = userRepo;
     }
 
     public async Task<ReportResponse> CreateAsync(int reporterId, CreateReportRequest request)
@@ -42,6 +48,15 @@ public class ReportManager : IReportManager
             ?? throw new InvalidOperationException("Failed to retrieve created report");
 
         _logger.LogInformation("Report created: {ReportId} for product {ProductId}", report.Id, request.ProductId);
+
+        // Notify all admins about new report
+        var admins = await _userRepo.GetUsersByRoleAsync(UserRole.Admin);
+        foreach (var admin in admins)
+        {
+            await _notificationManager.CreateAsync(admin.Id, "New Report",
+                $"A new report has been filed for product #{request.ProductId}.");
+        }
+
         return MapToResponse(saved);
     }
 

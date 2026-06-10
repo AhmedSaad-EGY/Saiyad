@@ -18,6 +18,7 @@ public class ProductRepository : IProductRepository
     {
         var query = _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available)
             .AsQueryable();
 
@@ -38,6 +39,12 @@ public class ProductRepository : IProductRepository
 
         if (filter.InStock == true)
             query = query.Where(p => p.StockQuantity > 0);
+
+        if (filter.SellerId.HasValue)
+            query = query.Where(p => p.SellerId == filter.SellerId);
+
+            if (filter.IsAuctioned.HasValue)
+            query = query.Where(p => p.IsAuctioned == filter.IsAuctioned.Value);
 
         var totalCount = await query.CountAsync();
 
@@ -72,6 +79,7 @@ public class ProductRepository : IProductRepository
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null);
     }
 
@@ -79,6 +87,7 @@ public class ProductRepository : IProductRepository
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .Where(p => p.SellerId == sellerId && p.DeletedAt == null)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();

@@ -156,4 +156,4 @@ For the full platform documentation including:
 - Implemented features checklist
 - Future roadmap and missing features
 
-→ See `Front-end/README.md` or `Front-end/PROJECT_MAP.md`
+→ See `Front-end/README.md` or `Front-end/PROJECT_MAP_FRONT-END.md`

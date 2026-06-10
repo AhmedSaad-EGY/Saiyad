@@ -87,8 +87,6 @@ public class AuctionManager : IAuctionManager
         var product = await _productRepo.GetByIdAsync(request.ProductId)
             ?? throw new KeyNotFoundException("Product not found");
 
-        if (product.SellerId != userId)
-            throw new UnauthorizedAccessException("You can only auction your own products");
 
         var startTime = request.StartTime ?? DateTime.UtcNow;
         var isScheduled = startTime > DateTime.UtcNow.AddMinutes(1);

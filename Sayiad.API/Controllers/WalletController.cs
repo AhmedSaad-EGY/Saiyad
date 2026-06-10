@@ -6,7 +6,7 @@ using System.Security.Claims;
 
 namespace Sayiad.API.Controllers;
 
-[Route("api/[controller]")]
+    [Route("api/[controller]")]
 [ApiController]
 [Authorize]
 public class WalletController : ControllerBase

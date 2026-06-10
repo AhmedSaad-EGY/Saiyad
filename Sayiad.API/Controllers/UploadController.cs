@@ -18,27 +18,38 @@ public class UploadController : ControllerBase
     [RequestSizeLimit(5 * 1024 * 1024)]
     public async Task<IActionResult> Upload(IFormFile file)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file provided");
 
-        if (file.Length > MaxFileSize)
-            return BadRequest("File size exceeds 5 MB limit");
+            if (file.Length > MaxFileSize)
+                return BadRequest("File size exceeds 5 MB limit");
 
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(ext))
-            return BadRequest("Only jpg, jpeg, png, webp files are allowed");
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedExtensions.Contains(ext))
+                return BadRequest("Only jpg, jpeg, png, webp files are allowed");
 
-        if (!IsValidImageBytes(file))
-            return BadRequest("File content does not match a valid image format.");
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
 
-        await using var stream = file.OpenReadStream();
-        var url = await _fileStorage.UploadAsync(stream, file.FileName, "sayiad/products");
-        return Ok(new { url });
+            if (!IsValidImageBytes(memoryStream))
+                return BadRequest("File content does not match a valid image format.");
+
+            memoryStream.Position = 0;
+            var url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/profiles");
+            return Ok(new { url });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Image upload failed. Please try again." });
+        }
     }
 
-    private static bool IsValidImageBytes(IFormFile file)
+    private static bool IsValidImageBytes(Stream stream)
     {
-        using var reader = new BinaryReader(file.OpenReadStream());
+        using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
         var bytes = reader.ReadBytes(4);
 
         // JPEG: FF D8 FF

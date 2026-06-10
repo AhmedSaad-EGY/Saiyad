@@ -30,15 +30,20 @@ public class CartManager : ICartManager
         var product = await _productRepo.GetByIdAsync(request.ProductId)
             ?? throw new KeyNotFoundException("Product not found");
 
-        if (product.Status != ProductStatus.Available || product.StockQuantity < request.Quantity)
-            throw new InvalidOperationException("Product is not available or insufficient stock");
+        if (product.Status != ProductStatus.Available)
+            throw new InvalidOperationException("Product is not available");
 
         var cart = await GetOrCreateCartAsync(userId);
 
         var existingItem = cart.CartItems.FirstOrDefault(i => i.ProductId == request.ProductId);
+        var totalQuantity = (existingItem?.Quantity ?? 0) + request.Quantity;
+
+        if (product.StockQuantity < totalQuantity)
+            throw new InvalidOperationException("Insufficient stock");
+
         if (existingItem != null)
         {
-            existingItem.Quantity += request.Quantity;
+            existingItem.Quantity = totalQuantity;
         }
         else
         {
@@ -126,7 +131,8 @@ public class CartManager : ICartManager
         var items = cart.CartItems.Select(i => new CartItemResponse(
             i.Id, i.ProductId, i.Product.Title, i.Product.Price,
             i.Product.Images.FirstOrDefault(img => img.IsPrimary)?.ImageUrl,
-            i.Quantity, i.Product.Price * i.Quantity, i.CreatedAt
+            i.Quantity, i.Product.Price * i.Quantity, i.CreatedAt,
+            i.Product.StockQuantity
         )).ToList();
 
         return new CartResponse(cart.Id, items, items.Sum(i => i.Subtotal));
