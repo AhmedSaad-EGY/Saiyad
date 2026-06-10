@@ -13,6 +13,15 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddOpenApi();
 
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-CSRF-Token";
+        options.Cookie.Name = "XSRF-TOKEN";
+        options.Cookie.HttpOnly = false;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
+
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("Dev")));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -131,6 +140,7 @@ try
             tags: ["db", "sql"]);
     builder.Services.AddHostedService<AuctionExpiryService>();
     builder.Services.AddTransient<Sayiad.Api.Middleware.ExceptionMiddleware>();
+    builder.Services.AddTransient<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
 
     var app = builder.Build();
 
@@ -189,6 +199,7 @@ try
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
     app.MapControllers();
     app.MapHealthChecks("/health");
     app.MapHub<AuctionHub>("/hubs/auction");

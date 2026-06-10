@@ -6,7 +6,7 @@ using Sayiad.Domain.Dtos.CartDtos;
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+    [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
 public class CartController : ControllerBase
 {

@@ -11,7 +11,7 @@ namespace Sayiad.Api.Controllers;
 /// email verification, password reset (forgot + reset), and password change.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+    [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthManager _authManager;
