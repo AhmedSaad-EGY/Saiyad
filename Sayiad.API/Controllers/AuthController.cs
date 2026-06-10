@@ -34,14 +34,38 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login(LoginRequest request)
     {
         var result = await _authManager.LoginAsync(request);
-        return Ok(result);
+
+        Response.Cookies.Append("sayiad_refreshToken", result.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = "/api/auth",
+            Expires = DateTime.UtcNow.AddDays(7)
+        });
+
+        return Ok(new { token = result.Token, expiresAt = result.ExpiresAt, user = result.User });
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(RefreshTokenRequest request)
+    public async Task<IActionResult> Refresh()
     {
-        var result = await _authManager.RefreshTokenAsync(request.RefreshToken);
-        return Ok(result);
+        var refreshToken = Request.Cookies["sayiad_refreshToken"];
+        if (string.IsNullOrEmpty(refreshToken))
+            return Unauthorized(new { message = "Refresh token not found" });
+
+        var result = await _authManager.RefreshTokenAsync(refreshToken);
+
+        Response.Cookies.Append("sayiad_refreshToken", result.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = "/api/auth",
+            Expires = DateTime.UtcNow.AddDays(7)
+        });
+
+        return Ok(new { token = result.Token, expiresAt = result.ExpiresAt, user = result.User });
     }
 
     [Authorize]
