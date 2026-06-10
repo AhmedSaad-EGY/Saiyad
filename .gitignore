@@ -44,3 +44,4 @@ $RECYCLE.BIN/
 *.log
 *.tmp
 *.cache
+*.py
