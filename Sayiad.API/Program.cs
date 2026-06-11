@@ -22,12 +22,16 @@ try
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
 
+    var connStr = builder.Configuration.GetConnectionString("Dev")
+        ?? Environment.GetEnvironmentVariable("DB_CONNECTION")
+        ?? throw new InvalidOperationException("Database connection string is missing");
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("Dev")));
+        options.UseSqlServer(connStr));
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = jwtSettings["SecretKey"]
+        ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
         ?? throw new InvalidOperationException("JWT SecretKey is missing");
 
     builder.Services.AddAuthentication(options =>
@@ -139,12 +143,13 @@ try
     })
         .AddJsonOptions(options =>
         {
+            options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         });
     builder.Services.AddHealthChecks()
         .AddSqlServer(
-            builder.Configuration.GetConnectionString("Dev")!,
+            connStr,
             name: "database",
             tags: ["db", "sql"]);
     builder.Services.AddHostedService<AuctionExpiryService>();
@@ -190,7 +195,8 @@ try
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to apply database migrations. App will continue but some features may not work.");
+            Log.Fatal(ex, "Failed to apply database migrations. Shutting down to prevent schema corruption.");
+            throw;
         }
     }
 

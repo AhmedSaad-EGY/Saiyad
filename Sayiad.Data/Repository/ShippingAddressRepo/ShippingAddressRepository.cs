@@ -19,9 +19,10 @@ public class ShippingAddressRepository : IShippingAddressRepository
         return address;
     }
 
-    public async Task<ShippingAddress?> GetByIdAsync(int id)
+    public async Task<ShippingAddress?> GetByIdAsync(int id, int userId)
     {
-        return await _db.ShippingAddresses.FindAsync(id);
+        return await _db.ShippingAddresses
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
     }
 
     public async Task<List<ShippingAddress>> GetByUserIdAsync(int userId)
@@ -33,9 +34,10 @@ public class ShippingAddressRepository : IShippingAddressRepository
             .ToListAsync();
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, int userId)
     {
-        var address = await _db.ShippingAddresses.FindAsync(id);
+        var address = await _db.ShippingAddresses
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
         if (address == null) return false;
 
         _db.ShippingAddresses.Remove(address);

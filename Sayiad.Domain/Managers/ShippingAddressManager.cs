@@ -31,13 +31,7 @@ public class ShippingAddressManager : IShippingAddressManager
 
     public async Task<bool> DeleteAsync(int userId, int addressId)
     {
-        var address = await _repo.GetByIdAsync(addressId)
-            ?? throw new KeyNotFoundException("Shipping address not found");
-
-        if (address.UserId != userId)
-            throw new UnauthorizedAccessException("You can only delete your own addresses.");
-
-        return await _repo.DeleteAsync(addressId);
+        return await _repo.DeleteAsync(addressId, userId);
     }
 
     public async Task<List<ShippingAddressResponse>> GetMyAddressesAsync(int userId)

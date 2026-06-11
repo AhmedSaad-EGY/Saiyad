@@ -31,7 +31,7 @@ public class PaymentManager : IPaymentManager
 
     public async Task<PaymentResponse> InitiateAsync(int userId, InitiatePaymentRequest request)
     {
-        var order = await _orderRepo.GetByIdAsync(request.OrderId)
+        var order = await _orderRepo.GetByIdAsync(request.OrderId, userId)
             ?? throw new KeyNotFoundException("Order not found");
 
         if (order.BuyerId != userId)
@@ -96,12 +96,8 @@ public class PaymentManager : IPaymentManager
         payment.Order.Status = CustomerOrderStatus.Paid;
         payment.Order.UpdatedAt = DateTime.UtcNow;
 
-        await _paymentRepo.UpdateAsync(payment);
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
-
-        // Wallet settlement: deduct full amount from buyer, credit each seller 95%, admin gets 5%
-        var order = await _orderRepo.GetByIdAsync(payment.OrderId);
+        // Wallet settlement INSIDE transaction: deduct full amount from buyer, credit each seller 95%, admin gets 5%
+        var order = await _orderRepo.GetByIdAsync(payment.OrderId, userId);
         if (order != null)
         {
             await _walletManager.DeductForOrderAsync(order.BuyerId, order.TotalPrice, order.Id);
@@ -130,14 +126,18 @@ public class PaymentManager : IPaymentManager
             }
         }
 
+        await _paymentRepo.UpdateAsync(payment);
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Payment confirmed: {PaymentId}", paymentId);
         return MapToResponse(payment);
     }
 
     public async Task<IEnumerable<PaymentResponse>> GetOrderPaymentsAsync(int orderId, int userId)
     {
-        var payments = await _paymentRepo.GetOrderPaymentsAsync(orderId);
-        return payments.Where(p => p.Order.BuyerId == userId).Select(MapToResponse);
+        var payments = await _paymentRepo.GetOrderPaymentsAsync(orderId, userId);
+        return payments.Select(MapToResponse);
     }
 
     private static PaymentResponse MapToResponse(Payment p) => new(

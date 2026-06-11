@@ -27,7 +27,7 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Deposit amount must be positive");
 
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         wallet.Balance += amount;
@@ -53,7 +53,7 @@ public class WalletManager : IWalletManager
 
     public async Task HoldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         if (wallet.AvailableBalance < amount)
@@ -83,7 +83,7 @@ public class WalletManager : IWalletManager
 
     public async Task ReleaseHeldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         wallet.HeldBalance -= amount;
@@ -113,9 +113,9 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Transfer amount must be positive");
 
-        var fromWallet = await _walletRepo.GetByUserIdAsync(fromUserId)
+        var fromWallet = await _walletRepo.GetByUserIdWithLockAsync(fromUserId)
             ?? throw new KeyNotFoundException("Sender wallet not found");
-        var toWallet = await _walletRepo.GetByUserIdAsync(toUserId)
+        var toWallet = await _walletRepo.GetByUserIdWithLockAsync(toUserId)
             ?? throw new KeyNotFoundException("Receiver wallet not found");
 
         fromWallet.Balance -= amount;
@@ -158,7 +158,7 @@ public class WalletManager : IWalletManager
 
     public async Task DeductForOrderAsync(int userId, decimal amount, int orderId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         if (wallet.AvailableBalance < amount)
@@ -191,7 +191,8 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Seller credit amount must be positive");
 
-        var wallet = await GetOrCreateWalletAsync(sellerId);
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
+            ?? await GetOrCreateWalletAsync(sellerId);
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
@@ -220,9 +221,9 @@ public class WalletManager : IWalletManager
         if (winningAmount <= 0)
             throw new InvalidOperationException("Winning amount must be positive");
 
-        var winnerWallet = await _walletRepo.GetByUserIdAsync(winnerId)
+        var winnerWallet = await _walletRepo.GetByUserIdWithLockAsync(winnerId)
             ?? throw new KeyNotFoundException("Winner wallet not found");
-        var sellerWallet = await _walletRepo.GetByUserIdAsync(sellerId)
+        var sellerWallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
             ?? throw new KeyNotFoundException("Seller wallet not found");
 
         var platformFee = winningAmount * 0.05m;
@@ -270,7 +271,8 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Fee amount must be positive");
 
-        var wallet = await GetOrCreateWalletAsync(platformUserId);
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(platformUserId)
+            ?? await GetOrCreateWalletAsync(platformUserId);
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
@@ -298,7 +300,7 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Subscription amount must be positive");
 
-        var wallet = await _walletRepo.GetByUserIdAsync(userId)
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         if (wallet.AvailableBalance < amount)
@@ -345,7 +347,7 @@ public class WalletManager : IWalletManager
 
     public async Task<bool> HasSufficientBalanceAsync(int userId, decimal amount)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId);
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId);
         if (wallet == null) return false;
         return wallet.AvailableBalance >= amount;
     }

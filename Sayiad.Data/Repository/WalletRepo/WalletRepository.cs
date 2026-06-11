@@ -57,7 +57,7 @@ public class WalletRepository : IWalletRepository
     public async Task<Wallet?> GetByUserIdWithLockAsync(int userId)
     {
         return await _db.Set<Wallet>()
-            .FromSqlRaw("SELECT * FROM Wallets WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0}", userId)
+            .FromSqlInterpolated($"SELECT * FROM Wallets WITH (UPDLOCK, ROWLOCK) WHERE UserId = {userId}")
             .FirstOrDefaultAsync();
     }
 }

@@ -136,19 +136,15 @@ public class OrderManager : IOrderManager
 
     public async Task<OrderResponse> GetByIdAsync(int orderId, int userId)
     {
-        var order = await _orderRepo.GetByIdAsync(orderId)
+        var order = await _orderRepo.GetByIdAsync(orderId, userId)
             ?? throw new KeyNotFoundException("Order not found");
-
-        if (order.BuyerId != userId &&
-            !order.OrderItems.Any(oi => oi.SellerId == userId))
-            throw new UnauthorizedAccessException("Access denied");
 
         return MapToResponse(order);
     }
 
     public async Task<OrderResponse> CancelAsync(int orderId, int userId)
     {
-        var order = await _orderRepo.GetByIdAsync(orderId)
+        var order = await _orderRepo.GetByIdAsync(orderId, userId)
             ?? throw new KeyNotFoundException("Order not found");
 
         if (order.BuyerId != userId)
@@ -185,7 +181,7 @@ public class OrderManager : IOrderManager
 
     public async Task<OrderResponse> UpdateStatusAsync(int orderId, CustomerOrderStatus status)
     {
-        var order = await _orderRepo.GetByIdAsync(orderId)
+        var order = await _orderRepo.GetByIdAsync(orderId, 0)
             ?? throw new KeyNotFoundException("Order not found");
 
         order.Status = status;

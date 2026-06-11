@@ -22,11 +22,12 @@ public class ReviewRepository : IReviewRepository
             .ToListAsync();
     }
 
-    public async Task<Review?> GetByIdAsync(int id)
+    public async Task<Review?> GetByIdAsync(int id, int? userId = null)
     {
-        return await _db.Reviews
-            .Include(r => r.User)
-            .FirstOrDefaultAsync(r => r.Id == id);
+        var query = _db.Reviews.Include(r => r.User).Where(r => r.Id == id);
+        if (userId.HasValue)
+            query = query.Where(r => r.UserId == userId.Value);
+        return await query.FirstOrDefaultAsync();
     }
 
     public async Task<bool> ExistsForUserAsync(int productId, int userId)
