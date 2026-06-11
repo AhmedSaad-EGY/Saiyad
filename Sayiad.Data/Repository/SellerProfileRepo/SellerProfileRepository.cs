@@ -41,9 +41,10 @@ public class SellerProfileRepository : ISellerProfileRepository
         return profile;
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, int userId)
     {
-        var profile = await _db.SellerProfiles.FindAsync(id);
+        var profile = await _db.SellerProfiles
+            .FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
         if (profile == null) return false;
 
         _db.SellerProfiles.Remove(profile);

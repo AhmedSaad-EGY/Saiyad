@@ -69,7 +69,7 @@ public class ReviewManager : IReviewManager
         _logger.LogInformation("Review created: Product {ProductId}, User {UserId}, Rating {Rating}",
             request.ProductId, userId, request.Rating);
 
-        var savedReview = await _reviewRepo.GetByIdAsync(review.Id)
+        var savedReview = await _reviewRepo.GetByIdAsync(review.Id, userId)
             ?? throw new KeyNotFoundException("Review not found");
 
         var product = await _productRepo.GetByIdAsync(request.ProductId);
@@ -87,7 +87,7 @@ public class ReviewManager : IReviewManager
 
     public async Task DeleteAsync(int reviewId, int userId)
     {
-        var review = await _reviewRepo.GetByIdAsync(reviewId)
+        var review = await _reviewRepo.GetByIdAsync(reviewId, userId)
             ?? throw new KeyNotFoundException("Review not found");
 
         if (review.UserId != userId)

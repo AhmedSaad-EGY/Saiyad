@@ -121,7 +121,6 @@ public class ProductManager : IProductManager
         product.StockQuantity = request.StockQuantity;
         product.Location = InputSanitizer.SanitizeNullable(request.Location) ?? string.Empty;
         product.CategoryId = request.CategoryId;
-        product.Status = request.Status;
         product.UpdatedAt = DateTime.UtcNow;
 
         await _repo.UpdateAsync(product);

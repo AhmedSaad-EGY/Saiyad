@@ -6,7 +6,7 @@ public interface ISellerProfileRepository
     Task<SellerProfile?> GetByUserIdAsync(int userId);
     Task<SellerProfile> CreateAsync(SellerProfile profile);
     Task<SellerProfile> UpdateAsync(SellerProfile profile);
-    Task<bool> DeleteAsync(int id);
+    Task<bool> DeleteAsync(int id, int userId);
     Task UpdateRatingAsync(int sellerId);
     Task IncrementSalesAsync(int sellerId);
 }

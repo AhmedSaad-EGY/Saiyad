@@ -21,15 +21,26 @@ public class ImageController : ControllerBase
     [HttpGet("{folder}/{fileName}")]
     public IActionResult Get(string folder, string fileName)
     {
-        var basePath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-        var path = Path.Combine(basePath, "uploads", folder, fileName);
-
-        if (!System.IO.File.Exists(path))
-            return NotFound();
+        if (folder.Contains("..") || fileName.Contains("..") ||
+            folder.Contains("/") || fileName.Contains("/") ||
+            folder.Contains("\\") || fileName.Contains("\\") ||
+            folder.Contains(":") || fileName.Contains(":"))
+            return BadRequest("Invalid path");
 
         var ext = Path.GetExtension(fileName);
-        var contentType = MimeMap.TryGetValue(ext, out var mime) ? mime : "application/octet-stream";
+        if (!MimeMap.ContainsKey(ext))
+            return BadRequest("Unsupported file type");
 
-        return PhysicalFile(path, contentType);
+        var basePath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+        var fullPath = Path.GetFullPath(Path.Combine(basePath, "uploads", folder, fileName));
+        var uploadsDir = Path.GetFullPath(Path.Combine(basePath, "uploads"));
+
+        if (!fullPath.StartsWith(uploadsDir, StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Invalid path");
+
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound();
+
+        return PhysicalFile(fullPath, MimeMap[ext]);
     }
 }

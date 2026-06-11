@@ -70,7 +70,7 @@ public class OrdersController : BaseController
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout(CheckoutRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
 
         // 1. Create order from cart
         var createRequest = new CreateOrderRequest(request.ShippingAddressId);

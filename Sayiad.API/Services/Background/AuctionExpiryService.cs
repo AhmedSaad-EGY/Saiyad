@@ -69,6 +69,8 @@ public class AuctionExpiryService : BackgroundService
             {
                 try
                 {
+                    await using var tx = await unitOfWork.BeginTransactionAsync();
+
                     auction.Status = AuctionStatus.Finished;
 
                     var winningBid = auction.Bids
@@ -81,8 +83,6 @@ public class AuctionExpiryService : BackgroundService
                         if (auction.Product != null)
                             auction.Product.Status = ProductStatus.Sold;
                     }
-
-                    await unitOfWork.SaveChangesAsync();
 
                     if (auction.WinnerUserId.HasValue && winningBid != null && auction.Product != null)
                     {
@@ -103,6 +103,10 @@ public class AuctionExpiryService : BackgroundService
                             winningBid.UserId, winningBid.Amount, "Auction", auction.Id);
                     }
 
+                    await unitOfWork.SaveChangesAsync();
+                    await tx.CommitAsync();
+
+                    // Non-critical notifications and emails outside transaction
                     if (auction.WinnerUserId.HasValue)
                     {
                         await notificationManager.CreateAsync(auction.WinnerUserId.Value,

@@ -17,12 +17,12 @@ public class PaymentRepository : IPaymentRepository
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<IEnumerable<Payment>> GetOrderPaymentsAsync(int orderId)
+    public async Task<IEnumerable<Payment>> GetOrderPaymentsAsync(int orderId, int userId)
     {
         return await _db.Payments
             .Include(p => p.Transactions)
             .Include(p => p.Order)
-            .Where(p => p.OrderId == orderId)
+            .Where(p => p.OrderId == orderId && p.Order.BuyerId == userId)
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
     }

@@ -56,7 +56,7 @@ public class OrderRepository : IOrderRepository
             .ToListAsync();
     }
 
-    public async Task<CustomerOrder?> GetByIdAsync(int orderId)
+    public async Task<CustomerOrder?> GetByIdAsync(int orderId, int userId)
     {
         return await _db.CustomerOrders
             .Include(o => o.OrderItems)
@@ -65,7 +65,8 @@ public class OrderRepository : IOrderRepository
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Seller)
             .Include(o => o.Buyer)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
+            .FirstOrDefaultAsync(o => o.Id == orderId &&
+                (o.BuyerId == userId || o.OrderItems.Any(oi => oi.SellerId == userId)));
     }
 
     public async Task AddAsync(CustomerOrder order)

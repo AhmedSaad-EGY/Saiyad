@@ -40,6 +40,9 @@ $RECYCLE.BIN/
 *.mdf
 *.ldf
 
+## Production secrets (never commit)
+Sayiad.API/appsettings.Production.json
+
 ## Miscellaneous
 *.log
 *.tmp
