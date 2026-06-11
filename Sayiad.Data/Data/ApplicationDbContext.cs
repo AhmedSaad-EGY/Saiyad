@@ -28,6 +28,7 @@
         public DbSet<Wallet> Wallets { get; set; } = null!;
         public DbSet<WalletTransaction> WalletTransactions { get; set; } = null!;
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; } = null!;
+        public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

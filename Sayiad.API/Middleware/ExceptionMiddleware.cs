@@ -20,22 +20,26 @@ public class ExceptionMiddleware : IMiddleware
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning(ex, "Unauthorized access attempt");
-            await WriteErrorResponse(context, HttpStatusCode.Unauthorized, ex.Message);
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.Unauthorized, ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
             _logger.LogWarning(ex, "Resource not found");
-            await WriteErrorResponse(context, HttpStatusCode.NotFound, ex.Message);
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.NotFound, ex.Message);
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Invalid operation");
-            await WriteErrorResponse(context, HttpStatusCode.BadRequest, ex.Message);
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.BadRequest, ex.Message);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
-            await WriteErrorResponse(context, HttpStatusCode.InternalServerError, ex.Message);
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.InternalServerError, "An unexpected error occurred. Please try again later.");
         }
     }
 

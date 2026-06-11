@@ -1,13 +1,8 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.ReportDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ReportsController : ControllerBase
+public class ReportsController : BaseController
 {
     private readonly IReportManager _reportManager;
 
@@ -20,7 +15,7 @@ public class ReportsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateReportRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var report = await _reportManager.CreateAsync(userId, request);
         return CreatedAtAction(nameof(GetById), new { id = report.Id }, report);
     }

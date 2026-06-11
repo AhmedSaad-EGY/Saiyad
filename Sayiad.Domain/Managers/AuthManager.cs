@@ -11,6 +11,7 @@ public class AuthManager : IAuthManager
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
     private readonly IWalletManager _walletManager;
+    private readonly IAuditService _auditService;
     private readonly ILogger<AuthManager> _logger;
 
     public AuthManager(
@@ -18,19 +19,21 @@ public class AuthManager : IAuthManager
         ITokenService tokenService,
         IEmailService emailService,
         IWalletManager walletManager,
+        IAuditService auditService,
         ILogger<AuthManager> logger)
     {
         _userRepo = userRepo;
         _tokenService = tokenService;
         _emailService = emailService;
         _walletManager = walletManager;
+        _auditService = auditService;
         _logger = logger;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
-        if (request.Role == nameof(UserRole.Admin))
-            throw new UnauthorizedAccessException("Admin accounts cannot be self-registered.");
+        // B-002: Override any client-provided role — public registrations are always Customer
+        const UserRole fixedRole = UserRole.Customer;
 
         if (await _userRepo.EmailExistsAsync(request.Email))
             throw new InvalidOperationException("Email already registered");
@@ -41,10 +44,11 @@ public class AuthManager : IAuthManager
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Phone = request.Phone,
-            Role = Enum.Parse<UserRole>(request.Role),
+            Role = fixedRole,
             IsActive = true,
             IsEmailVerified = false,
             LicenseNumber = request.LicenseNumber,
+            Birthdate = string.IsNullOrEmpty(request.Birthdate) ? null : DateOnly.Parse(request.Birthdate).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -66,6 +70,7 @@ public class AuthManager : IAuthManager
                <p>If you did not register, ignore this email.</p>");
 
         _logger.LogInformation("User registered: {Email} as {Role}", user.Email, user.Role);
+        await _auditService.LogAsync(user.Id, "Register", "User", user.Id, null, $"Role={user.Role}");
         return await GenerateAuthResponse(user);
     }
 
@@ -84,15 +89,37 @@ public class AuthManager : IAuthManager
             throw new UnauthorizedAccessException("Please verify your email before logging in.");
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
+        await _auditService.LogAsync(user.Id, "Login", "User", user.Id);
         return await GenerateAuthResponse(user);
     }
 
     public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
     {
-        var user = await _userRepo.GetByRefreshTokenAsync(HashToken(refreshToken))
-            ?? throw new UnauthorizedAccessException("Invalid or expired refresh token");
+        var tokenHash = HashToken(refreshToken);
+        var user = await _userRepo.GetByRefreshTokenAsync(tokenHash);
+
+        if (user is null)
+        {
+            // Check if this was a replayed (stolen) token — matches previous hash
+            user = await _userRepo.GetByPreviousRefreshTokenHashAsync(tokenHash);
+            if (user is not null)
+            {
+                _logger.LogWarning("Refresh token replay detected for user {Email} — possible token theft. Invalidating all sessions.", user.Email);
+                user.RefreshToken = null;
+                user.PreviousRefreshTokenHash = null;
+                user.RefreshTokenExpiry = null;
+                await _userRepo.UpdateAsync(user);
+                throw new UnauthorizedAccessException("Session compromised. Please log in again.");
+            }
+
+            throw new UnauthorizedAccessException("Invalid or expired refresh token");
+        }
+
+        // Before rotating, stash current hash for theft detection on next replay
+        user.PreviousRefreshTokenHash = HashToken(refreshToken);
 
         _logger.LogInformation("Token refreshed for user: {Email}", user.Email);
+        await _auditService.LogAsync(user.Id, "RefreshToken", "User", user.Id);
         return await GenerateAuthResponse(user);
     }
 
@@ -106,6 +133,7 @@ public class AuthManager : IAuthManager
         await _userRepo.UpdateAsync(user);
 
         _logger.LogInformation("User logged out: {UserId}", userId);
+        await _auditService.LogAsync(userId, "Logout", "User", userId);
     }
 
     public async Task VerifyEmailAsync(string token)

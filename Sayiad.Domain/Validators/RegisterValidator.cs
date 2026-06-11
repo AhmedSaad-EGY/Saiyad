@@ -18,8 +18,24 @@ public class RegisterValidator : AbstractValidator<RegisterRequest>
             .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter")
             .Matches("[0-9]").WithMessage("Password must contain at least one digit");
         RuleFor(x => x.Phone).NotEmpty();
+        RuleFor(x => x.ConfirmPassword)
+            .NotEmpty().WithMessage("Confirm password is required.")
+            .Equal(x => x.Password).WithMessage("Passwords do not match.");
+        RuleFor(x => x.Birthdate)
+            .NotEmpty().WithMessage("Birthdate is required.")
+            .Must(BeAtLeast18).WithMessage("You must be at least 18 years old.");
         RuleFor(x => x.LicenseNumber)
             .NotEmpty().WithMessage("License number is required for Fishermen.")
             .When(x => x.Role == nameof(UserRole.Fisherman));
+    }
+
+    private static bool BeAtLeast18(string? birthdate)
+    {
+        if (string.IsNullOrEmpty(birthdate)) return false;
+        if (!DateOnly.TryParse(birthdate, out var parsed)) return false;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var age = today.Year - parsed.Year;
+        if (parsed > today.AddYears(-age)) age--;
+        return age >= 18;
     }
 }

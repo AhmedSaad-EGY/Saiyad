@@ -1,6 +1,6 @@
 namespace Sayiad.Domain.Dtos.AuthDtos;
 
-public record RegisterRequest(string FullName, string Email, string Password, string Phone, string Role = "Customer", string? LicenseNumber = null);
+public record RegisterRequest(string FullName, string Email, string Password, string Phone, string? Birthdate = null, string ConfirmPassword = "", string Role = "Customer", string? LicenseNumber = null);
 public record LoginRequest(string Email, string Password);
 public record RefreshTokenRequest(string RefreshToken);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);

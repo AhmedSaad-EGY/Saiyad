@@ -71,6 +71,12 @@ public class UserRepository : IUserRepository
             u.RefreshToken == refreshToken && u.RefreshTokenExpiry > DateTime.UtcNow);
     }
 
+    public async Task<User?> GetByPreviousRefreshTokenHashAsync(string previousHash)
+    {
+        return await _db.Users.FirstOrDefaultAsync(u =>
+            u.PreviousRefreshTokenHash == previousHash && u.RefreshTokenExpiry > DateTime.UtcNow);
+    }
+
     public async Task<User?> GetByVerificationTokenAsync(string token)
     {
         return await _db.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == token);

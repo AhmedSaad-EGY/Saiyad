@@ -1,14 +1,8 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Contracts.Subscription;
-using Sayiad.Domain.Dtos.Subscription;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SubscriptionsController : ControllerBase
+public class SubscriptionsController : BaseController
 {
     private readonly ISubscriptionManager _subscriptionManager;
 
@@ -21,7 +15,7 @@ public class SubscriptionsController : ControllerBase
     [HttpPost("upgrade")]
     public async Task<IActionResult> Upgrade(UpgradeSubscriptionRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var result = await _subscriptionManager.UpgradeAsync(userId, request);
 
         if (!result.IsSuccess)
@@ -34,7 +28,7 @@ public class SubscriptionsController : ControllerBase
     [HttpGet("my")]
     public async Task<IActionResult> GetMySubscription()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var result = await _subscriptionManager.GetMySubscriptionAsync(userId);
 
         if (!result.IsSuccess)

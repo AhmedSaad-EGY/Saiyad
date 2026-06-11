@@ -60,3 +60,4 @@ global using Sayiad.Domain.Contracts;
 global using Sayiad.Domain.Contracts.Subscription;
 global using Sayiad.Domain.Dtos.Subscription;
 global using Sayiad.Domain.Validators;
+global using Microsoft.AspNetCore.SignalR;

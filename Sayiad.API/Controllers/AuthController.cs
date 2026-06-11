@@ -1,9 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
-using Sayiad.Domain.Dtos.AuthDtos;
-
 namespace Sayiad.Api.Controllers;
 
 /// <summary>
@@ -11,8 +5,8 @@ namespace Sayiad.Api.Controllers;
 /// email verification, password reset (forgot + reset), and password change.
 /// </summary>
 [ApiController]
-    [Route("api/[controller]")]
-public class AuthController : ControllerBase
+[Route("api/[controller]")]
+public class AuthController : BaseController
 {
     private readonly IAuthManager _authManager;
 
@@ -72,7 +66,7 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _authManager.LogoutAsync(userId);
         return NoContent();
     }
@@ -132,7 +126,7 @@ public class AuthController : ControllerBase
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _authManager.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
         return NoContent();
     }

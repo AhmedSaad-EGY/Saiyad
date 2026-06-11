@@ -51,10 +51,13 @@ try
         {
             OnMessageReceived = context =>
             {
-                var accessToken = context.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken))
+                if (context.Request.Path.StartsWithSegments("/hubs"))
                 {
-                    context.Token = accessToken;
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken))
+                    {
+                        context.Token = accessToken;
+                    }
                 }
                 return Task.CompletedTask;
             }
@@ -139,6 +142,7 @@ try
             name: "database",
             tags: ["db", "sql"]);
     builder.Services.AddHostedService<AuctionExpiryService>();
+    builder.Services.AddScoped<IAuditService, Sayiad.Api.Services.Audit.AuditService>();
     builder.Services.AddTransient<Sayiad.Api.Middleware.ExceptionMiddleware>();
     builder.Services.AddTransient<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
 
@@ -187,11 +191,20 @@ try
     app.UseMiddleware<Sayiad.Api.Middleware.RequestLoggingMiddleware>();
     app.UseMiddleware<Sayiad.Api.Middleware.ExceptionMiddleware>();
 
-    //if (app.Environment.IsDevelopment())
-    //{
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+        await next();
+    });
+
+    if (app.Environment.IsDevelopment())
+    {
         app.UseSwagger();
         app.UseSwaggerUI();
-    //}
+    }
 
     app.UseStaticFiles();
     app.UseHttpsRedirection();
