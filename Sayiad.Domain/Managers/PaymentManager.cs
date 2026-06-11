@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sayiad.Data.Data;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Dtos.PaymentDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -12,6 +14,7 @@ public class PaymentManager : IPaymentManager
     private readonly ILogger<PaymentManager> _logger;
     private readonly IWalletManager _walletManager;
     private readonly IUserRepository _userRepo;
+    private readonly IOptions<AppSettings> _settings;
 
     public PaymentManager(
         IPaymentRepository paymentRepo,
@@ -19,7 +22,8 @@ public class PaymentManager : IPaymentManager
         IUnitOfWork unitOfWork,
         ILogger<PaymentManager> logger,
         IWalletManager walletManager,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        IOptions<AppSettings> settings)
     {
         _paymentRepo = paymentRepo;
         _orderRepo = orderRepo;
@@ -27,6 +31,7 @@ public class PaymentManager : IPaymentManager
         _logger = logger;
         _walletManager = walletManager;
         _userRepo = userRepo;
+        _settings = settings;
     }
 
     public async Task<PaymentResponse> InitiateAsync(int userId, InitiatePaymentRequest request)
@@ -102,7 +107,7 @@ public class PaymentManager : IPaymentManager
         {
             await _walletManager.DeductForOrderAsync(order.BuyerId, order.TotalPrice, order.Id);
 
-            var admin = await _userRepo.GetByEmailAsync("sayiadapp@gmail.com");
+            var admin = await _userRepo.GetByEmailAsync(_settings.Value.AdminEmail);
             var adminId = admin?.Id;
 
             var sellerGroups = order.OrderItems.GroupBy(i => i.SellerId);

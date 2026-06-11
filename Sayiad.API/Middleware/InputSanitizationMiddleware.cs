@@ -48,19 +48,14 @@ public class InputSanitizationMiddleware
         if (context.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true
             && context.Request.ContentLength > 0)
         {
+            if (context.Request.ContentLength > 10 * 1024 * 1024)
+            {
+                context.Response.StatusCode = 413;
+                return;
+            }
+
             context.Request.EnableBuffering();
-            using var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true);
-            var body = await reader.ReadToEndAsync();
-            var sanitized = SanitizeValue(body);
-            if (sanitized != body)
-            {
-                var bytes = Encoding.UTF8.GetBytes(sanitized);
-                context.Request.Body = new MemoryStream(bytes);
-            }
-            else
-            {
-                context.Request.Body.Position = 0;
-            }
+            context.Request.Body.Position = 0;
         }
 
         await _next(context);

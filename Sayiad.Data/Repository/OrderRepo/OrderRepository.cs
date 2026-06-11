@@ -69,6 +69,18 @@ public class OrderRepository : IOrderRepository
                 (o.BuyerId == userId || o.OrderItems.Any(oi => oi.SellerId == userId)));
     }
 
+    public async Task<CustomerOrder?> GetByIdForAdminAsync(int orderId)
+    {
+        return await _db.CustomerOrders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+                    .ThenInclude(p => p.Images)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Seller)
+            .Include(o => o.Buyer)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+    }
+
     public async Task AddAsync(CustomerOrder order)
     {
         _db.CustomerOrders.Add(order);

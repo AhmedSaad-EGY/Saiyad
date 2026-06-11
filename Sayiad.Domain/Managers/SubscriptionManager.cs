@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Sayiad.Data.Data;
+using Sayiad.Domain.Common;
 using Sayiad.Domain.Contracts.Subscription;
 using Sayiad.Domain.Dtos.Subscription;
 
@@ -10,6 +13,8 @@ public class SubscriptionManager : ISubscriptionManager
     private readonly ISubscriptionRepository _subRepo;
     private readonly ISubscriptionPlanRepository _planRepo;
     private readonly IWalletManager _walletManager;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IOptions<AppSettings> _settings;
     private readonly ILogger<SubscriptionManager> _logger;
 
     public SubscriptionManager(
@@ -17,12 +22,16 @@ public class SubscriptionManager : ISubscriptionManager
         ISubscriptionRepository subRepo,
         ISubscriptionPlanRepository planRepo,
         IWalletManager walletManager,
+        IUnitOfWork unitOfWork,
+        IOptions<AppSettings> settings,
         ILogger<SubscriptionManager> logger)
     {
         _userRepo = userRepo;
         _subRepo = subRepo;
         _planRepo = planRepo;
         _walletManager = walletManager;
+        _unitOfWork = unitOfWork;
+        _settings = settings;
         _logger = logger;
     }
 
@@ -45,6 +54,8 @@ public class SubscriptionManager : ISubscriptionManager
         var duplicateRef = await _subRepo.PaymentReferenceExistsAsync(request.PaymentReference);
         if (duplicateRef)
             return Result<SubscriptionResponse>.Failure("Payment reference already exists. Duplicate payment references are not allowed.");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         var activeSub = await _subRepo.GetActiveAsync(userId);
         if (activeSub is not null)
@@ -69,7 +80,7 @@ public class SubscriptionManager : ISubscriptionManager
         {
             await _walletManager.DeductForSubscriptionAsync(userId, plan.Price, subscription.Id);
 
-            var admin = await _userRepo.GetByEmailAsync("sayiadapp@gmail.com");
+            var admin = await _userRepo.GetByEmailAsync(_settings.Value.AdminEmail);
             if (admin != null)
             {
                 await _walletManager.CreditPlatformFeeAsync(admin.Id, plan.Price, "Subscription", subscription.Id);
@@ -78,6 +89,8 @@ public class SubscriptionManager : ISubscriptionManager
 
         user.SubscriptionTier = tier;
         await _userRepo.UpdateAsync(user);
+
+        await tx.CommitAsync();
 
         var used = await _subRepo.GetMonthlyAuctionCountAsync(userId);
 

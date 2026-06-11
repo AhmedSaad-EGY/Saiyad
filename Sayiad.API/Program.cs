@@ -162,6 +162,9 @@ try
     builder.Services.AddScoped<IAuthManager, AuthManager>();
     builder.Services.AddScoped<IUserManager, UserManager>();
 
+    builder.Services.Configure<Sayiad.Domain.Common.AppSettings>(
+        builder.Configuration.GetSection("AppSettings"));
+
     // ── Services ──────────────────────────────────────────────────────────────
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
@@ -239,7 +242,7 @@ try
         using var scope = app.Services.CreateScope();
         var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var walletManager = scope.ServiceProvider.GetRequiredService<IWalletManager>();
-        const string adminEmail = "sayiadapp@gmail.com";
+        var adminEmail = app.Configuration["AppSettings:AdminEmail"] ?? "sayiadapp@gmail.com";
 
         var admin = await userRepo.GetByEmailAsync(adminEmail);
 

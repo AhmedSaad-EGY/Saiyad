@@ -25,17 +25,16 @@ public class WalletRepository : IWalletRepository
         return wallet;
     }
 
-    public async Task<Wallet> UpdateAsync(Wallet wallet)
+    public Task<Wallet> UpdateAsync(Wallet wallet)
     {
         _db.Set<Wallet>().Update(wallet);
-        await _db.SaveChangesAsync();
-        return wallet;
+        return Task.FromResult(wallet);
     }
 
-    public async Task AddTransactionAsync(WalletTransaction transaction)
+    public Task AddTransactionAsync(WalletTransaction transaction)
     {
         _db.Set<WalletTransaction>().Add(transaction);
-        await _db.SaveChangesAsync();
+        return Task.CompletedTask;
     }
 
     public async Task<List<WalletTransaction>> GetTransactionsAsync(int walletId, PaginationRequest pagination)

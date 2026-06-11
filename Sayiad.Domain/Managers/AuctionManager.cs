@@ -130,8 +130,7 @@ public class AuctionManager : IAuctionManager
         // Auto-bidding requires Basic subscription or higher
         if (request.MaxAutoBidAmount.HasValue && request.MaxAutoBidAmount > 0)
         {
-            var biddingUser = await _userRepo.GetByIdAsync(userId);
-            if (biddingUser?.SubscriptionTier == SubscriptionTier.Free)
+            if (bidUser.SubscriptionTier == SubscriptionTier.Free)
                 throw new InvalidOperationException(
                     "Auto-bidding requires a Basic subscription or higher. Upgrade your plan to use this feature.");
         }
@@ -232,12 +231,14 @@ public class AuctionManager : IAuctionManager
 
     private async Task ResolveAutoBidsAsync(int auctionId)
     {
+        var auction = await _auctionRepo.GetByIdWithBidsAsync(auctionId);
+        if (auction == null || auction.Status != AuctionStatus.Active) return;
+
         const int maxIterations = 20;
+        var changed = false;
+
         for (int i = 0; i < maxIterations; i++)
         {
-            var auction = await _auctionRepo.GetByIdWithBidsAsync(auctionId);
-            if (auction == null || auction.Status != AuctionStatus.Active) return;
-
             var currentWinningBid = auction.Bids
                 .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
             var currentWinnerId = currentWinningBid?.UserId;
@@ -256,13 +257,13 @@ public class AuctionManager : IAuctionManager
                 .OrderByDescending(x => x.MaxBid)
                 .FirstOrDefault();
 
-            if (bestAutoBid == null) return;
+            if (bestAutoBid == null) break;
 
             var nextBid = Math.Min(
                 bestAutoBid.MaxBid,
                 auction.CurrentHighestBid + auction.MinimumIncrement);
 
-            if (nextBid <= auction.CurrentHighestBid) return;
+            if (nextBid <= auction.CurrentHighestBid) break;
 
             foreach (var prevBid in auction.Bids.Where(b => b.BidStatus == BidStatus.Winning))
             {
@@ -282,8 +283,7 @@ public class AuctionManager : IAuctionManager
 
             auction.Bids.Add(autoBid);
             auction.CurrentHighestBid = nextBid;
-
-            await _unitOfWork.SaveChangesAsync();
+            changed = true;
 
             if (currentWinnerId.HasValue && currentWinnerId.Value != bestAutoBid.UserId)
             {
@@ -295,6 +295,9 @@ public class AuctionManager : IAuctionManager
             _logger.LogInformation("Auto-bid placed: {BidAmount} on auction {AuctionId} by user {UserId}",
                 nextBid, auctionId, bestAutoBid.UserId);
         }
+
+        if (changed)
+            await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<AuctionResponse> EndAuctionAsync(int auctionId, int userId)
@@ -302,7 +305,9 @@ public class AuctionManager : IAuctionManager
         var auction = await _auctionRepo.GetByIdWithDetailsAsync(auctionId)
             ?? throw new KeyNotFoundException("Auction not found");
 
-        if (auction.CreatedByUserId != userId)
+        var user = await _userRepo.GetByIdAsync(userId);
+        var isAdmin = user?.Role == UserRole.Admin;
+        if (!isAdmin && auction.CreatedByUserId != userId)
             throw new UnauthorizedAccessException("You can only end your own auctions.");
 
         if (auction.Status != AuctionStatus.Active)
@@ -549,24 +554,17 @@ public class AuctionManager : IAuctionManager
 
     public async Task<AuctioneerDashboardResponse> GetAuctioneerDashboardAsync(int auctioneerId)
     {
-        var allAuctions = await _auctionRepo.GetByCreatorAsync(auctioneerId);
-        var pendingRequests = await _auctionRepo.GetPendingRequestsAsync(new PaginationRequest { Page = 1, PageSize = 1000 });
+        var dashboardStats = await _auctionRepo.GetDashboardStatsAsync(auctioneerId);
+        var requestCounts = await _auctionRepo.GetRequestCountsByStatusAsync();
 
-        var active = allAuctions.Count(a => a.Status == AuctionStatus.Active);
-        var finished = allAuctions.Count(a => a.Status == AuctionStatus.Finished);
-        var totalBids = allAuctions.Sum(a => a.Bids.Count);
-        var totalBidValue = allAuctions.Sum(a => a.Bids.Sum(b => b.Amount));
-        var avgBids = allAuctions.Any() ? (double)totalBids / allAuctions.Count : 0;
-
-        var approvedRequests = pendingRequests.Items
-            .Count(r => r.Status == AuctionRequestStatus.Approved);
-        var rejectedRequests = pendingRequests.Items
-            .Count(r => r.Status == AuctionRequestStatus.Rejected);
+        var avgBids = dashboardStats.Total > 0
+            ? (double)dashboardStats.TotalBids / dashboardStats.Total
+            : 0;
 
         return new AuctioneerDashboardResponse(
-            allAuctions.Count, active, finished,
-            pendingRequests.TotalCount, approvedRequests, rejectedRequests,
-            totalBidValue, totalBids, Math.Round(avgBids, 1));
+            dashboardStats.Total, dashboardStats.Active, dashboardStats.Finished,
+            requestCounts.Pending, requestCounts.Approved, requestCounts.Rejected,
+            dashboardStats.TotalBidValue, dashboardStats.TotalBids, Math.Round(avgBids, 1));
     }
 
     private static AuctionResponse MapToResponse(Auction auction) => new(

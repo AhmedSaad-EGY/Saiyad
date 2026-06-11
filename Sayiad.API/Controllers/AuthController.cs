@@ -90,12 +90,9 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
     {
-        var result = await _authManager.ForgotPasswordAsync(request);
+        await _authManager.ForgotPasswordAsync(request);
 
-        if (!result.IsSuccess)
-            return NotFound(new { message = result.Error });
-
-        return Ok(new { message = "Reset code sent to your email." });
+        return Ok(new { message = "If that email is registered you will receive a reset code." });
     }
 
     [HttpPost("verify-reset-code")]

@@ -181,7 +181,7 @@ public class OrderManager : IOrderManager
 
     public async Task<OrderResponse> UpdateStatusAsync(int orderId, CustomerOrderStatus status)
     {
-        var order = await _orderRepo.GetByIdAsync(orderId, 0)
+        var order = await _orderRepo.GetByIdForAdminAsync(orderId)
             ?? throw new KeyNotFoundException("Order not found");
 
         order.Status = status;

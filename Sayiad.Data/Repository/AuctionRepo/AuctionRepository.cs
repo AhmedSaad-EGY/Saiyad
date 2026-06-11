@@ -90,7 +90,8 @@ public class AuctionRepository : IAuctionRepository
         var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         return await _db.Bids
-            .CountAsync(b => b.UserId == userId && b.CreatedAt >= startOfMonth);
+            .CountAsync(b => b.UserId == userId && b.CreatedAt >= startOfMonth
+                          && !b.IsAutoBid);
     }
 
     public async Task<int> GetUserMonthlyRequestCountAsync(int userId)
@@ -182,4 +183,44 @@ public class AuctionRepository : IAuctionRepository
             .Include(a => a.Bids)
             .Where(a => a.CreatedByUserId == userId)
             .ToListAsync();
+
+    public async Task<(int Pending, int Approved, int Rejected)> GetRequestCountsByStatusAsync()
+    {
+        var counts = await _db.AuctionRequests
+            .GroupBy(r => r.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        return (
+            counts.FirstOrDefault(c => c.Status == AuctionRequestStatus.Pending)?.Count ?? 0,
+            counts.FirstOrDefault(c => c.Status == AuctionRequestStatus.Approved)?.Count ?? 0,
+            counts.FirstOrDefault(c => c.Status == AuctionRequestStatus.Rejected)?.Count ?? 0
+        );
+    }
+
+    public async Task<(int Total, int Active, int Finished, int TotalBids, decimal TotalBidValue)> GetDashboardStatsAsync(int auctioneerId)
+    {
+        var auctions = _db.Auctions.Where(a => a.CreatedByUserId == auctioneerId);
+        var total = await auctions.CountAsync();
+        var active = await auctions.CountAsync(a => a.Status == AuctionStatus.Active);
+        var finished = await auctions.CountAsync(a => a.Status == AuctionStatus.Finished);
+
+        var bidStats = await auctions
+            .SelectMany(a => a.Bids)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalBids = g.Count(),
+                TotalBidValue = g.Sum(b => b.Amount)
+            })
+            .FirstOrDefaultAsync();
+
+        return (
+            total,
+            active,
+            finished,
+            bidStats?.TotalBids ?? 0,
+            bidStats?.TotalBidValue ?? 0
+        );
+    }
 }

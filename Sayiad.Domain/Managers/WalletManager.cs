@@ -27,13 +27,13 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Deposit amount must be positive");
 
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
-
-        await _walletRepo.UpdateAsync(wallet);
 
         var txn = new WalletTransaction
         {
@@ -47,12 +47,17 @@ public class WalletManager : IWalletManager
         };
         await _walletRepo.AddTransactionAsync(txn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Wallet deposit: User {UserId}, Amount {Amount}", userId, amount);
         return MapWallet(wallet);
     }
 
     public async Task HoldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
@@ -61,8 +66,6 @@ public class WalletManager : IWalletManager
 
         wallet.HeldBalance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
-
-        await _walletRepo.UpdateAsync(wallet);
 
         var txn = new WalletTransaction
         {
@@ -77,20 +80,23 @@ public class WalletManager : IWalletManager
         };
         await _walletRepo.AddTransactionAsync(txn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Funds held: User {UserId}, Amount {Amount}, Ref {RefType}#{RefId}",
             userId, amount, referenceType, referenceId);
     }
 
     public async Task ReleaseHeldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
         wallet.HeldBalance -= amount;
         if (wallet.HeldBalance < 0) wallet.HeldBalance = 0;
         wallet.UpdatedAt = DateTime.UtcNow;
-
-        await _walletRepo.UpdateAsync(wallet);
 
         var txn = new WalletTransaction
         {
@@ -105,6 +111,9 @@ public class WalletManager : IWalletManager
         };
         await _walletRepo.AddTransactionAsync(txn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Funds released: User {UserId}, Amount {Amount}, Ref {RefType}#{RefId}",
             userId, amount, referenceType, referenceId);
     }
@@ -113,10 +122,15 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Transfer amount must be positive");
 
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var fromWallet = await _walletRepo.GetByUserIdWithLockAsync(fromUserId)
             ?? throw new KeyNotFoundException("Sender wallet not found");
         var toWallet = await _walletRepo.GetByUserIdWithLockAsync(toUserId)
             ?? throw new KeyNotFoundException("Receiver wallet not found");
+
+        if (fromWallet.AvailableBalance < amount)
+            throw new InvalidOperationException("Insufficient available balance.");
 
         fromWallet.Balance -= amount;
         fromWallet.HeldBalance -= amount;
@@ -125,8 +139,6 @@ public class WalletManager : IWalletManager
 
         toWallet.Balance += amount;
         toWallet.UpdatedAt = DateTime.UtcNow;
-
-        await _unitOfWork.SaveChangesAsync();
 
         var fromTxn = new WalletTransaction
         {
@@ -152,12 +164,17 @@ public class WalletManager : IWalletManager
         await _walletRepo.AddTransactionAsync(fromTxn);
         await _walletRepo.AddTransactionAsync(toTxn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Transfer: From User {FromId} → To User {ToId}, Amount {Amount}",
             fromUserId, toUserId, amount);
     }
 
     public async Task DeductForOrderAsync(int userId, decimal amount, int orderId)
     {
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
 
@@ -167,8 +184,6 @@ public class WalletManager : IWalletManager
         wallet.Balance -= amount;
         wallet.HeldBalance = Math.Max(0, wallet.HeldBalance - amount);
         wallet.UpdatedAt = DateTime.UtcNow;
-
-        await _walletRepo.UpdateAsync(wallet);
 
         var txn = new WalletTransaction
         {
@@ -183,6 +198,9 @@ public class WalletManager : IWalletManager
         };
         await _walletRepo.AddTransactionAsync(txn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Order payment: User {UserId}, Order {OrderId}, Amount {Amount}",
             userId, orderId, amount);
     }
@@ -191,13 +209,13 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Seller credit amount must be positive");
 
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
             ?? await GetOrCreateWalletAsync(sellerId);
 
         wallet.Balance += amount;
         wallet.UpdatedAt = DateTime.UtcNow;
-
-        await _walletRepo.UpdateAsync(wallet);
 
         var txn = new WalletTransaction
         {
@@ -212,6 +230,9 @@ public class WalletManager : IWalletManager
         };
         await _walletRepo.AddTransactionAsync(txn);
 
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
         _logger.LogInformation("Seller credit: User {SellerId}, Order {OrderId}, Amount {Amount}",
             sellerId, orderId, amount);
     }
@@ -220,6 +241,8 @@ public class WalletManager : IWalletManager
     {
         if (winningAmount <= 0)
             throw new InvalidOperationException("Winning amount must be positive");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         var winnerWallet = await _walletRepo.GetByUserIdWithLockAsync(winnerId)
             ?? throw new KeyNotFoundException("Winner wallet not found");
@@ -259,6 +282,7 @@ public class WalletManager : IWalletManager
         });
 
         await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation(
             "Auction payment settled: Winner {WinnerId}, Seller {SellerId}, " +
@@ -270,6 +294,8 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0)
             throw new InvalidOperationException("Fee amount must be positive");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(platformUserId)
             ?? await GetOrCreateWalletAsync(platformUserId);
@@ -289,6 +315,7 @@ public class WalletManager : IWalletManager
         });
 
         await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation(
             "Platform fee credited: User {PlatformUserId}, Amount {Amount}, Ref {RefType}#{RefId}",
@@ -299,6 +326,8 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0)
             throw new InvalidOperationException("Subscription amount must be positive");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
 
         var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
             ?? throw new KeyNotFoundException("Wallet not found");
@@ -321,6 +350,7 @@ public class WalletManager : IWalletManager
         });
 
         await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
 
         _logger.LogInformation(
             "Subscription payment: User {UserId}, Amount {Amount}, Subscription {SubscriptionId}",

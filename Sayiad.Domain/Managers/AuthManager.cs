@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Sayiad.Domain.Common;
 using Sayiad.Domain.Contracts;
@@ -12,6 +14,7 @@ public class AuthManager : IAuthManager
     private readonly IEmailService _emailService;
     private readonly IWalletManager _walletManager;
     private readonly IAuditService _auditService;
+    private readonly IOptions<AppSettings> _settings;
     private readonly ILogger<AuthManager> _logger;
 
     public AuthManager(
@@ -20,6 +23,7 @@ public class AuthManager : IAuthManager
         IEmailService emailService,
         IWalletManager walletManager,
         IAuditService auditService,
+        IOptions<AppSettings> settings,
         ILogger<AuthManager> logger)
     {
         _userRepo = userRepo;
@@ -27,6 +31,7 @@ public class AuthManager : IAuthManager
         _emailService = emailService;
         _walletManager = walletManager;
         _auditService = auditService;
+        _settings = settings;
         _logger = logger;
     }
 
@@ -43,11 +48,11 @@ public class AuthManager : IAuthManager
             FullName = InputSanitizer.Sanitize(request.FullName),
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Phone = request.Phone,
+            Phone = InputSanitizer.SanitizeNullable(request.Phone),
             Role = fixedRole,
             IsActive = true,
             IsEmailVerified = false,
-            LicenseNumber = request.LicenseNumber,
+            LicenseNumber = InputSanitizer.SanitizeNullable(request.LicenseNumber),
             Birthdate = string.IsNullOrEmpty(request.Birthdate) ? null : DateOnly.Parse(request.Birthdate).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -59,7 +64,7 @@ public class AuthManager : IAuthManager
 
         await _walletManager.CreateWalletAsync(user.Id);
 
-        var verifyUrl = $"https://saiyad-eg.vercel.app/#/verify-email?token={rawVerificationToken}";
+        var verifyUrl = $"{_settings.Value.FrontendUrl}/#/verify-email?token={rawVerificationToken}";
         await _emailService.SendAsync(
             user.Email,
             "Verify your Sayiad account",
@@ -151,18 +156,16 @@ public class AuthManager : IAuthManager
 
     public async Task ResendVerificationAsync(string email)
     {
-        var user = await _userRepo.GetByEmailAsync(email)
-            ?? throw new KeyNotFoundException("User not found.");
+        var user = await _userRepo.GetByEmailAsync(email);
 
-        if (user.IsEmailVerified)
-            throw new InvalidOperationException("Email is already verified.");
+        if (user is null || user.IsEmailVerified) return;
 
         var rawToken = Guid.NewGuid().ToString("N");
         user.EmailVerificationToken = HashToken(rawToken);
         user.UpdatedAt = DateTime.UtcNow;
         await _userRepo.UpdateAsync(user);
 
-        var verifyUrl = $"https://saiyad-eg.vercel.app/#/verify-email?token={rawToken}";
+        var verifyUrl = $"{_settings.Value.FrontendUrl}/#/verify-email?token={rawToken}";
         await _emailService.SendAsync(
             user.Email,
             "Verify your Sayiad account",
@@ -182,10 +185,10 @@ public class AuthManager : IAuthManager
         if (user is null)
         {
             _logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
-            return Result.Failure("Email not found.");
+            return Result.Success();
         }
 
-        var otp = Random.Shared.Next(100000, 999999).ToString();
+        var otp = RandomNumberGenerator.GetInt32(100_000, 1_000_000).ToString();
         user.PasswordResetToken = BCrypt.Net.BCrypt.HashPassword(otp);
         user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(15);
         user.UpdatedAt = DateTime.UtcNow;

@@ -34,8 +34,6 @@ public class AuctionExpiryService : BackgroundService
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider
-                .GetRequiredService<ApplicationDbContext>();
             var auctionRepo = scope.ServiceProvider
                 .GetRequiredService<IAuctionRepository>();
             var unitOfWork = scope.ServiceProvider
@@ -48,6 +46,8 @@ public class AuctionExpiryService : BackgroundService
                 .GetRequiredService<IWalletManager>();
             var userRepo = scope.ServiceProvider
                 .GetRequiredService<IUserRepository>();
+            var db = scope.ServiceProvider
+                .GetRequiredService<ApplicationDbContext>();
 
             // Activate scheduled auctions whose start time has arrived
             var toActivate = await db.Auctions
@@ -61,7 +61,7 @@ public class AuctionExpiryService : BackgroundService
             }
 
             if (toActivate.Any())
-                await db.SaveChangesAsync();
+                await unitOfWork.SaveChangesAsync();
 
             var expiredAuctions = await auctionRepo.GetExpiredActiveAsync();
 

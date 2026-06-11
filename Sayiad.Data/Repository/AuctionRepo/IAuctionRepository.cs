@@ -21,4 +21,6 @@ public interface IAuctionRepository
     Task<PagedResult<AuctionRequest>> GetFishermanRequestsAsync(int fishermanId, PaginationRequest pagination);
     Task<AuctionRequest> UpdateRequestAsync(AuctionRequest request);
     Task<List<Auction>> GetByCreatorAsync(int userId);
+    Task<(int Pending, int Approved, int Rejected)> GetRequestCountsByStatusAsync();
+    Task<(int Total, int Active, int Finished, int TotalBids, decimal TotalBidValue)> GetDashboardStatsAsync(int auctioneerId);
 }
