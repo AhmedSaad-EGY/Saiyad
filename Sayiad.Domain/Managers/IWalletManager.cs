@@ -13,6 +13,7 @@ public interface IWalletManager
     Task CreditSellerAsync(int sellerId, decimal amount, int orderId);
     Task<WalletTransactionsResponse> GetTransactionsAsync(int userId, PaginationRequest pagination);
     Task<bool> HasSufficientBalanceAsync(int userId, decimal amount);
+    Task<bool> WalletExistsAsync(int userId);
     Task CreateWalletAsync(int userId);
     Task SettleAuctionPaymentAsync(int winnerId, int sellerId, decimal winningAmount, int auctionId);
     Task CreditPlatformFeeAsync(int platformUserId, decimal amount, string referenceType, int referenceId);

@@ -66,14 +66,16 @@ try
 
     builder.Services.AddAuthorization();
 
+    var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+        ?? throw new InvalidOperationException("CORS origins not configured");
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowFrontend", policy =>
         {
             policy
-                .WithOrigins("https://saiyad-eg.vercel.app")
-                .AllowAnyHeader()
-                .AllowAnyMethod()
+                .WithOrigins(corsOrigins)
+                .WithHeaders("Content-Type", "Authorization", "X-CSRF-Token", "Accept")
+                .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
                 .AllowCredentials();
         });
     });
@@ -129,8 +131,12 @@ try
     builder.Services.AddScoped<IUserManager, UserManager>();
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
     builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddScoped<Sayiad.Api.Filters.RequireValidatorFilter>();
     builder.Services.AddSignalR();
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options =>
+    {
+        options.Filters.AddService<Sayiad.Api.Filters.RequireValidatorFilter>();
+    })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
@@ -155,8 +161,32 @@ try
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await db.Database.MigrateAsync();
-            Log.Information("Database migrations applied successfully");
+            var conn = db.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            await using var lockCmd = conn.CreateCommand();
+            lockCmd.CommandText = "EXEC sp_getapplock @Resource='SayiadMigration', @LockMode='Exclusive', @LockTimeout=30000";
+
+            var lockResult = Convert.ToInt32(await lockCmd.ExecuteScalarAsync());
+            if (lockResult >= 0)
+            {
+                try
+                {
+                    await db.Database.MigrateAsync();
+                    Log.Information("Database migrations applied successfully");
+                }
+                finally
+                {
+                    // Explicitly guarantee lock release even if MigrateAsync throws an exception
+                    await using var releaseCmd = conn.CreateCommand();
+                    releaseCmd.CommandText = "EXEC sp_releaseapplock @Resource='SayiadMigration'";
+                    await releaseCmd.ExecuteNonQueryAsync();
+                }
+            }
+            else
+            {
+                Log.Warning("Could not acquire migration lock (result: {Result}). Skipping migration.", lockResult);
+            }
         }
         catch (Exception ex)
         {
@@ -173,8 +203,15 @@ try
         var admin = await userRepo.GetByEmailAsync("sayiadapp@gmail.com");
         if (admin != null)
         {
-            await walletManager.CreateWalletAsync(admin.Id);
-            Log.Information("Admin wallet ensured for {Email}", admin.Email);
+            if (!await walletManager.WalletExistsAsync(admin.Id))
+            {
+                await walletManager.CreateWalletAsync(admin.Id);
+                Log.Information("Admin wallet created for {Email}", admin.Email);
+            }
+            else
+            {
+                Log.Information("Admin wallet already exists for {Email}", admin.Email);
+            }
         }
         else
         {
@@ -187,9 +224,15 @@ try
     }
 
     app.UseSerilogRequestLogging();
-    app.UseMiddleware<Sayiad.Api.Middleware.InputSanitizationMiddleware>();
-    app.UseMiddleware<Sayiad.Api.Middleware.RequestLoggingMiddleware>();
+
+    // 1. Global Exception Shield (Catches everything below)
     app.UseMiddleware<Sayiad.Api.Middleware.ExceptionMiddleware>();
+
+    // 2. Telemetry Logger (Captures request metrics safely)
+    app.UseMiddleware<Sayiad.Api.Middleware.RequestLoggingMiddleware>();
+
+    // 3. Input Sanitizer (Filters payloads before reaching controllers)
+    app.UseMiddleware<Sayiad.Api.Middleware.InputSanitizationMiddleware>();
 
     app.Use(async (context, next) =>
     {
@@ -206,8 +249,8 @@ try
         app.UseSwaggerUI();
     }
 
-    app.UseStaticFiles();
     app.UseHttpsRedirection();
+    app.UseStaticFiles();
     app.UseCors("AllowFrontend");
     app.UseRateLimiter();
     app.UseAuthentication();

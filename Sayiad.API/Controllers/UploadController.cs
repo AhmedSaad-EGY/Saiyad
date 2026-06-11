@@ -3,18 +3,12 @@ namespace Sayiad.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class UploadController : ControllerBase
+public class UploadController(IFileStorageService fileStorage, ILogger<UploadController> logger) : ControllerBase
 {
-    private readonly IFileStorageService _fileStorage;
-    private readonly ILogger<UploadController> _logger;
+    private readonly IFileStorageService _fileStorage = fileStorage;
+    private readonly ILogger<UploadController> _logger = logger;
     private const long MaxFileSize = 5 * 1024 * 1024;
     private static readonly string[] AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
-
-    public UploadController(IFileStorageService fileStorage, ILogger<UploadController> logger)
-    {
-        _fileStorage = fileStorage;
-        _logger = logger;
-    }
 
     [HttpPost]
     [RequestSizeLimit(5 * 1024 * 1024)]
