@@ -22,3 +22,18 @@ public class PlaceBidValidator : AbstractValidator<PlaceBidRequest>
         RuleFor(x => x.Amount).GreaterThan(0);
     }
 }
+
+public class ApproveAuctionRequestValidator : AbstractValidator<ApproveAuctionRequestRequest>
+{
+    public ApproveAuctionRequestValidator()
+    {
+        RuleFor(x => x.EndTime)
+            .GreaterThan(DateTime.UtcNow).WithMessage("End time must be in the future.");
+        RuleFor(x => x.StartingPrice)
+            .GreaterThan(0).WithMessage("Starting price must be greater than 0.");
+        RuleFor(x => x.ReservePrice)
+            .GreaterThanOrEqualTo(0).WithMessage("Reserve price must not be negative.");
+        RuleFor(x => x.MinimumIncrement)
+            .GreaterThan(0).WithMessage("Minimum increment must be greater than 0.");
+    }
+}
