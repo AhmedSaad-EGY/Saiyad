@@ -11,3 +11,11 @@ public class CreateReportValidator : AbstractValidator<CreateReportRequest>
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
     }
 }
+
+public class ResolveReportValidator : AbstractValidator<ResolveReportRequest>
+{
+    public ResolveReportValidator()
+    {
+        RuleFor(x => x.Status).NotEmpty().MaximumLength(50);
+    }
+}

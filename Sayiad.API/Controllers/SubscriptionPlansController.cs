@@ -28,7 +28,7 @@ public class SubscriptionPlansController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> Create([FromBody] CreateSubscriptionPlanRequest request)
     {
         var plan = await _planManager.CreateAsync(request);
@@ -36,7 +36,7 @@ public class SubscriptionPlansController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSubscriptionPlanRequest request)
     {
         var plan = await _planManager.UpdateAsync(id, request);
@@ -44,7 +44,7 @@ public class SubscriptionPlansController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> Delete(int id)
     {
         await _planManager.DeleteAsync(id);

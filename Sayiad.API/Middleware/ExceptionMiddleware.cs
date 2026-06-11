@@ -21,7 +21,7 @@ public class ExceptionMiddleware : IMiddleware
         {
             _logger.LogWarning(ex, "Unauthorized access attempt");
             if (!context.Response.HasStarted)
-                await WriteErrorResponse(context, HttpStatusCode.Unauthorized, ex.Message);
+                await WriteErrorResponse(context, HttpStatusCode.Unauthorized, "Authentication failed. Please log in again.");
         }
         catch (KeyNotFoundException ex)
         {
@@ -35,11 +35,44 @@ public class ExceptionMiddleware : IMiddleware
             if (!context.Response.HasStarted)
                 await WriteErrorResponse(context, HttpStatusCode.BadRequest, ex.Message);
         }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid argument");
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.BadRequest, ex.Message);
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "Invalid format");
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.BadRequest, "Invalid request format.");
+        }
+        catch (NotSupportedException ex)
+        {
+            _logger.LogWarning(ex, "Not supported");
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.BadRequest, "Operation is not supported.");
+        }
+        catch (TaskCanceledException)
+        {
+            _logger.LogInformation("Request cancelled by client");
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = 499;
+                return;
+            }
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database update error");
+            if (!context.Response.HasStarted)
+                await WriteErrorResponse(context, HttpStatusCode.Conflict, "A data conflict occurred. Please retry.");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
             if (!context.Response.HasStarted)
-                await WriteErrorResponse(context, HttpStatusCode.InternalServerError, "An unexpected error occurred. Please try again later.");
+                await WriteErrorResponse(context, HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
 

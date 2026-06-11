@@ -333,15 +333,14 @@ public class WalletManager : IWalletManager
         var items = await _walletRepo.GetTransactionsAsync(wallet.Id, pagination);
         var totalCount = await _walletRepo.GetTransactionCountAsync(wallet.Id);
 
-        return new WalletTransactionsResponse
-        {
-            Items = items.Select(t => new WalletTransactionResponse(
+        return new WalletTransactionsResponse(
+            items.Select(t => new WalletTransactionResponse(
                 t.Id, t.Amount, t.Type, t.ReferenceType, t.ReferenceId,
                 t.Description, t.BalanceSnapshot, t.CreatedAt)).ToList(),
-            TotalCount = totalCount,
-            Page = pagination.Page,
-            PageSize = pagination.PageSize
-        };
+            totalCount,
+            pagination.Page,
+            pagination.PageSize
+        );
     }
 
     public async Task<bool> HasSufficientBalanceAsync(int userId, decimal amount)
@@ -363,7 +362,13 @@ public class WalletManager : IWalletManager
         return wallet;
     }
 
-public async Task CreateWalletAsync(int userId)
+    public async Task<bool> WalletExistsAsync(int userId)
+    {
+        var wallet = await _walletRepo.GetByUserIdAsync(userId);
+        return wallet != null;
+    }
+
+    public async Task CreateWalletAsync(int userId)
     {
         var existing = await _walletRepo.GetByUserIdAsync(userId);
         if (existing != null) return;
@@ -377,8 +382,6 @@ public async Task CreateWalletAsync(int userId)
             UpdatedAt = DateTime.UtcNow
         };
         await _walletRepo.CreateAsync(wallet);
-
-        _logger.LogInformation("Wallet created for user {UserId}", userId);
     }
 
     private static WalletResponse MapWallet(Wallet w) => new(w.Balance, w.HeldBalance, w.AvailableBalance, w.CreatedAt);

@@ -37,3 +37,15 @@ public class ApproveAuctionRequestValidator : AbstractValidator<ApproveAuctionRe
             .GreaterThan(0).WithMessage("Minimum increment must be greater than 0.");
     }
 }
+
+public class RejectAuctionRequestValidator : AbstractValidator<RejectAuctionRequestRequest>
+{
+    public RejectAuctionRequestValidator()
+    {
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000).WithMessage("Rejection reason is required.");
+    }
+}
+
+public class AuctionFilterValidator : AbstractValidator<AuctionFilterRequest>
+{
+}

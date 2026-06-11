@@ -33,7 +33,7 @@ public class UsersController : BaseController
     [HttpDelete("profile/image")]
     public async Task<IActionResult> DeleteProfileImage()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _userManager.DeleteProfileImageAsync(userId);
         return Ok(new { message = "Profile image removed" });
     }
@@ -60,14 +60,5 @@ public class UsersController : BaseController
     {
         await _userManager.ToggleUserStatusAsync(id);
         return NoContent();
-    }
-
-    [Authorize]
-    [HttpGet("~/api/user")]
-    public async Task<IActionResult> GetCurrentUser()
-    {
-        var userId = GetUserId();
-        var result = await _userManager.GetProfileAsync(userId);
-        return Ok(result);
     }
 }
