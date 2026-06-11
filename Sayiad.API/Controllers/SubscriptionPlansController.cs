@@ -1,10 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.SubscriptionPlanDtos;
-using Sayiad.Domain.Managers;
-using System.Security.Claims;
-
-namespace Sayiad.API.Controllers;
+namespace Sayiad.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]

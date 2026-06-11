@@ -1,14 +1,9 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.CartDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
     [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
-public class CartController : ControllerBase
+public class CartController : BaseController
 {
     private readonly ICartManager _cartManager;
 
@@ -20,7 +15,7 @@ public class CartController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetCart()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var cart = await _cartManager.GetCartAsync(userId);
         return Ok(cart);
     }
@@ -28,7 +23,7 @@ public class CartController : ControllerBase
     [HttpPost("items")]
     public async Task<IActionResult> AddItem(AddToCartRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var cart = await _cartManager.AddItemAsync(userId, request);
         return Created("", cart);
     }
@@ -36,7 +31,7 @@ public class CartController : ControllerBase
     [HttpPut("items/{productId}")]
     public async Task<IActionResult> UpdateItem(int productId, UpdateCartItemRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var cart = await _cartManager.UpdateItemQuantityAsync(userId, productId, request);
         return Ok(cart);
     }
@@ -44,7 +39,7 @@ public class CartController : ControllerBase
     [HttpDelete("items/{productId}")]
     public async Task<IActionResult> RemoveItem(int productId)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _cartManager.RemoveItemAsync(userId, productId);
         return NoContent();
     }
@@ -52,7 +47,7 @@ public class CartController : ControllerBase
     [HttpDelete]
     public async Task<IActionResult> Clear()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _cartManager.ClearCartAsync(userId);
         return NoContent();
     }

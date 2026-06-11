@@ -1,15 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.WalletDtos;
-using Sayiad.Domain.Managers;
-using System.Security.Claims;
-
-namespace Sayiad.API.Controllers;
+namespace Sayiad.Api.Controllers;
 
     [Route("api/[controller]")]
 [ApiController]
 [Authorize]
-public class WalletController : ControllerBase
+public class WalletController : BaseController
 {
     private readonly IWalletManager _walletManager;
 
@@ -40,12 +34,5 @@ public class WalletController : ControllerBase
         var userId = GetUserId();
         var transactions = await _walletManager.GetTransactionsAsync(userId, pagination);
         return Ok(transactions);
-    }
-
-    private int GetUserId()
-    {
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token");
-        return int.Parse(claim.Value);
     }
 }

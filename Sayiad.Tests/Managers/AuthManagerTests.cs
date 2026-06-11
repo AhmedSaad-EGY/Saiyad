@@ -9,11 +9,12 @@ public class AuthManagerTests
     private readonly Mock<IUserRepository> _userRepoMock = new();
     private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IEmailService> _emailServiceMock = new();
+    private readonly Mock<IAuditService> _auditServiceMock = new();
     private readonly Mock<ILogger<AuthManager>> _loggerMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
     private AuthManager CreateManager() =>
         new(_userRepoMock.Object, _tokenServiceMock.Object,
-            _emailServiceMock.Object, _walletManagerMock.Object, _loggerMock.Object);
+            _emailServiceMock.Object, _walletManagerMock.Object, _auditServiceMock.Object, _loggerMock.Object);
 
     [Fact]
     public async Task Register_WithAdminRole_ThrowsUnauthorizedAccessException()

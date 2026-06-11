@@ -1,14 +1,9 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.ProductDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [RequestSizeLimit(5 * 1024 * 1024)]
-public class ProductsController : ControllerBase
+public class ProductsController : BaseController
 {
     private readonly IProductManager _productManager;
 
@@ -35,7 +30,7 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateProductRequest request)
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         var product = await _productManager.CreateAsync(sellerId, request);
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
     }
@@ -44,7 +39,7 @@ public class ProductsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateProductRequest request)
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         var product = await _productManager.UpdateAsync(id, sellerId, request);
         return Ok(product);
     }
@@ -53,7 +48,7 @@ public class ProductsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         await _productManager.DeleteAsync(id, sellerId);
         return NoContent();
     }
@@ -62,7 +57,7 @@ public class ProductsController : ControllerBase
     [HttpGet("my")]
     public async Task<IActionResult> GetMyProducts()
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         var products = await _productManager.GetSellerProductsAsync(sellerId);
         return Ok(products);
     }
@@ -71,7 +66,7 @@ public class ProductsController : ControllerBase
     [HttpPost("{id}/images")]
     public async Task<IActionResult> AddImage(int id, [FromBody] AddProductImageRequest request)
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         var result = await _productManager.AddImageAsync(id, sellerId, request);
         return Created("", result);
     }
@@ -80,7 +75,7 @@ public class ProductsController : ControllerBase
     [HttpDelete("{id}/images/{imageId}")]
     public async Task<IActionResult> DeleteImage(int id, int imageId)
     {
-        var sellerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var sellerId = GetUserId();
         await _productManager.DeleteImageAsync(id, imageId, sellerId);
         return NoContent();
     }
@@ -97,7 +92,7 @@ public class ProductsController : ControllerBase
     [HttpPatch("{id}/approve")]
     public async Task<IActionResult> Approve(int id)
     {
-        var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var adminId = GetUserId();
         var product = await _productManager.ApproveProductAsync(id, adminId);
         return Ok(product);
     }
@@ -106,7 +101,7 @@ public class ProductsController : ControllerBase
     [HttpPatch("{id}/reject")]
     public async Task<IActionResult> Reject(int id, [FromBody] RejectProductRequest request)
     {
-        var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var adminId = GetUserId();
         var product = await _productManager.RejectProductAsync(id, adminId, request.Reason);
         return Ok(product);
     }

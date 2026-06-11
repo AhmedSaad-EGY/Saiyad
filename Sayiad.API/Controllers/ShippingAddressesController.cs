@@ -1,14 +1,9 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.ShippingAddressDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
-public class ShippingAddressesController : ControllerBase
+public class ShippingAddressesController : BaseController
 {
     private readonly IShippingAddressManager _shippingAddressManager;
 
@@ -20,7 +15,7 @@ public class ShippingAddressesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateShippingAddressRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var address = await _shippingAddressManager.CreateAsync(userId, request);
         return CreatedAtAction(nameof(GetMyAddresses), new { }, address);
     }
@@ -28,7 +23,7 @@ public class ShippingAddressesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMyAddresses()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var addresses = await _shippingAddressManager.GetMyAddressesAsync(userId);
         return Ok(addresses);
     }
@@ -36,7 +31,7 @@ public class ShippingAddressesController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _shippingAddressManager.DeleteAsync(userId, id);
         return NoContent();
     }

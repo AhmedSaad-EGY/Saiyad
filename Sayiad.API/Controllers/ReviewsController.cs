@@ -1,14 +1,9 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.ReviewDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [RequestSizeLimit(1 * 1024 * 1024)]
-public class ReviewsController : ControllerBase
+public class ReviewsController : BaseController
 {
     private readonly IReviewManager _reviewManager;
 
@@ -35,7 +30,7 @@ public class ReviewsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateReviewRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var review = await _reviewManager.CreateAsync(userId, request);
         return CreatedAtAction(nameof(GetProductReviews), new { productId = request.ProductId }, review);
     }
@@ -44,7 +39,7 @@ public class ReviewsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         await _reviewManager.DeleteAsync(id, userId);
         return NoContent();
     }

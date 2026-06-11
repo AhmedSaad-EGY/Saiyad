@@ -1,13 +1,8 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.SellerProfileDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/seller-profile")]
-public class SellerProfileController : ControllerBase
+public class SellerProfileController : BaseController
 {
     private readonly ISellerProfileManager _sellerProfileManager;
 
@@ -20,7 +15,7 @@ public class SellerProfileController : ControllerBase
     [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     public async Task<IActionResult> Create(CreateSellerProfileRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var profile = await _sellerProfileManager.CreateAsync(userId, request);
         return StatusCode(201, profile);
     }
@@ -37,7 +32,7 @@ public class SellerProfileController : ControllerBase
     [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     public async Task<IActionResult> Update(UpdateSellerProfileRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var profile = await _sellerProfileManager.UpdateAsync(userId, request);
         return Ok(profile);
     }
@@ -46,7 +41,7 @@ public class SellerProfileController : ControllerBase
     [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     public async Task<IActionResult> GetMyProfile()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var profile = await _sellerProfileManager.GetMyProfileAsync(userId);
         return Ok(profile);
     }
@@ -55,7 +50,7 @@ public class SellerProfileController : ControllerBase
     [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     public async Task<IActionResult> GetDashboard()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var dashboard = await _sellerProfileManager.GetDashboardAsync(userId);
         return Ok(dashboard);
     }

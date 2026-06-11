@@ -1,12 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.UserDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UsersController : ControllerBase
+public class UsersController : BaseController
 {
     private readonly IUserManager _userManager;
 
@@ -19,7 +15,7 @@ public class UsersController : ControllerBase
     [HttpGet("profile")]
     public async Task<IActionResult> GetProfile()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var result = await _userManager.GetProfileAsync(userId);
         return Ok(result);
     }
@@ -28,7 +24,7 @@ public class UsersController : ControllerBase
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile(UpdateUserRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var result = await _userManager.UpdateProfileAsync(userId, request);
         return Ok(result);
     }
@@ -70,7 +66,7 @@ public class UsersController : ControllerBase
     [HttpGet("~/api/user")]
     public async Task<IActionResult> GetCurrentUser()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = GetUserId();
         var result = await _userManager.GetProfileAsync(userId);
         return Ok(result);
     }

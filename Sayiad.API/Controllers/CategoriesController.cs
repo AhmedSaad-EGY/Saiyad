@@ -1,7 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Sayiad.Domain.Dtos.CategoryDtos;
-
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
