@@ -71,10 +71,10 @@ public class AuthController : BaseController
         return NoContent();
     }
 
-    [HttpGet("verify-email")]
-    public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
     {
-        await _authManager.VerifyEmailAsync(token);
+        await _authManager.VerifyEmailAsync(request.Token);
         return Ok(new { message = "Email verified successfully. You can now log in." });
     }
 

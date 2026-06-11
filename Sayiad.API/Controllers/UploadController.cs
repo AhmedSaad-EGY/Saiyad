@@ -6,12 +6,14 @@ namespace Sayiad.Api.Controllers;
 public class UploadController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;
+    private readonly ILogger<UploadController> _logger;
     private const long MaxFileSize = 5 * 1024 * 1024;
     private static readonly string[] AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
 
-    public UploadController(IFileStorageService fileStorage)
+    public UploadController(IFileStorageService fileStorage, ILogger<UploadController> logger)
     {
         _fileStorage = fileStorage;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -38,11 +40,13 @@ public class UploadController : ControllerBase
                 return BadRequest("File content does not match a valid image format.");
 
             memoryStream.Position = 0;
-            var url = await _fileStorage.UploadAsync(memoryStream, file.FileName, "sayiad/profiles");
+            var safeName = $"{Guid.NewGuid()}{ext}";
+            var url = await _fileStorage.UploadAsync(memoryStream, safeName, "sayiad/profiles");
             return Ok(new { url });
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Image upload failed");
             return StatusCode(500, new { message = "Image upload failed. Please try again." });
         }
     }
