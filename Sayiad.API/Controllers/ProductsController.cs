@@ -113,4 +113,13 @@ public class ProductsController : BaseController
         var product = await _productManager.UpdateStatusAsync(id, request.Status);
         return Ok(product);
     }
+
+    [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
+    [HttpPatch("{id}/my-status")]
+    public async Task<IActionResult> UpdateMyStatus(int id, [FromBody] UpdateProductStatusRequest request)
+    {
+        var sellerId = GetUserId();
+        var product = await _productManager.UpdateSellerStatusAsync(id, sellerId, request.Status);
+        return Ok(product);
+    }
 }

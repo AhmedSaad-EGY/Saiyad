@@ -36,6 +36,15 @@ public class ReviewsController : BaseController
     }
 
     [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, UpdateReviewRequest request)
+    {
+        var userId = GetUserId();
+        var review = await _reviewManager.UpdateAsync(id, userId, request);
+        return Ok(review);
+    }
+
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

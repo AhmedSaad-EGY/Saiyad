@@ -6,6 +6,7 @@ public interface IWalletManager
 {
     Task<WalletResponse> GetWalletAsync(int userId);
     Task<WalletResponse> DepositAsync(int userId, decimal amount);
+    Task<WalletResponse> WithdrawAsync(int userId, decimal amount);
     Task HoldFundsAsync(int userId, decimal amount, string referenceType, int referenceId);
     Task ReleaseHeldFundsAsync(int userId, decimal amount, string referenceType, int referenceId);
     Task TransferFundsAsync(int fromUserId, int toUserId, decimal amount, string description);

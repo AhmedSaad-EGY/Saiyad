@@ -29,6 +29,14 @@ public class WalletController : BaseController
         return Ok(wallet);
     }
 
+    [HttpPost("withdraw")]
+    public async Task<IActionResult> Withdraw([FromBody] WithdrawRequest request)
+    {
+        var userId = GetUserId();
+        var wallet = await _walletManager.WithdrawAsync(userId, request.Amount);
+        return Ok(wallet);
+    }
+
     [HttpGet("transactions")]
     public async Task<IActionResult> GetTransactions([FromQuery] PaginationRequest pagination)
     {

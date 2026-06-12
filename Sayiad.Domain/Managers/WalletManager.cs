@@ -54,6 +54,40 @@ public class WalletManager : IWalletManager
         return MapWallet(wallet);
     }
 
+    public async Task<WalletResponse> WithdrawAsync(int userId, decimal amount)
+    {
+        if (amount <= 0) throw new InvalidOperationException("Withdrawal amount must be positive");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
+            ?? throw new KeyNotFoundException("Wallet not found");
+
+        if (wallet.AvailableBalance < amount)
+            throw new InvalidOperationException("Insufficient available balance for withdrawal");
+
+        wallet.Balance -= amount;
+        wallet.UpdatedAt = DateTime.UtcNow;
+
+        var txn = new WalletTransaction
+        {
+            WalletId = wallet.Id,
+            Amount = -amount,
+            Type = "Withdrawal",
+            ReferenceType = "Withdrawal",
+            Description = $"Withdrew {amount:N2} EGP",
+            BalanceSnapshot = wallet.Balance,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _walletRepo.AddTransactionAsync(txn);
+
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        _logger.LogInformation("Wallet withdrawal: User {UserId}, Amount {Amount}", userId, amount);
+        return MapWallet(wallet);
+    }
+
     public async Task HoldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
         await using var tx = await _unitOfWork.BeginTransactionAsync();

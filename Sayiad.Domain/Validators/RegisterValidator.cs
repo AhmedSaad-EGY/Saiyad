@@ -5,6 +5,9 @@ namespace Sayiad.Domain.Validators;
 
 public class RegisterValidator : AbstractValidator<RegisterRequest>
 {
+    private static readonly string[] AllowedRoles =
+        [nameof(UserRole.Customer), nameof(UserRole.Fisherman), nameof(UserRole.BaitSeller), nameof(UserRole.Auctioneer)];
+
     public RegisterValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().MinimumLength(2).MaximumLength(100);
@@ -24,6 +27,9 @@ public class RegisterValidator : AbstractValidator<RegisterRequest>
         RuleFor(x => x.Birthdate)
             .NotEmpty().WithMessage("Birthdate is required.")
             .Must(BeAtLeast18).WithMessage("You must be at least 18 years old.");
+        RuleFor(x => x.Role)
+            .Must(r => AllowedRoles.Contains(r))
+            .WithMessage("Role must be one of: Customer, Fisherman, BaitSeller, Auctioneer.");
         RuleFor(x => x.LicenseNumber)
             .NotEmpty().WithMessage("License number is required for Fishermen.")
             .When(x => x.Role == nameof(UserRole.Fisherman));

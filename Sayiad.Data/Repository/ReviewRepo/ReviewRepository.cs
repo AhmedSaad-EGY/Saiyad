@@ -41,6 +41,12 @@ public class ReviewRepository : IReviewRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task UpdateAsync(Review review)
+    {
+        _db.Reviews.Update(review);
+        await _db.SaveChangesAsync();
+    }
+
     public async Task DeleteAsync(Review review)
     {
         _db.Reviews.Remove(review);

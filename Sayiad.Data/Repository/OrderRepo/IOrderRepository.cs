@@ -4,6 +4,7 @@ namespace Sayiad.Data.Repository.OrderRepo;
 
 public interface IOrderRepository
 {
+    Task<PagedResult<CustomerOrder>> GetAllOrdersAsync(PaginationRequest pagination);
     Task<PagedResult<CustomerOrder>> GetUserOrdersAsync(int userId, PaginationRequest pagination);
     Task<IEnumerable<CustomerOrder>> GetSellerOrdersAsync(int sellerId);
     Task<CustomerOrder?> GetByIdAsync(int orderId, int userId);

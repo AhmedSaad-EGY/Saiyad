@@ -85,6 +85,30 @@ public class ReviewManager : IReviewManager
             savedReview.Rating, savedReview.Comment, savedReview.CreatedAt);
     }
 
+    public async Task<ReviewResponse> UpdateAsync(int reviewId, int userId, UpdateReviewRequest request)
+    {
+        var review = await _reviewRepo.GetByIdAsync(reviewId, userId)
+            ?? throw new KeyNotFoundException("Review not found");
+
+        if (review.UserId != userId)
+            throw new UnauthorizedAccessException("You can only edit your own reviews");
+
+        review.Rating = request.Rating;
+        review.Comment = InputSanitizer.SanitizeNullable(request.Comment);
+
+        await _reviewRepo.UpdateAsync(review);
+
+        var product = await _productRepo.GetByIdAsync(review.ProductId);
+        if (product != null)
+            await _sellerProfileRepo.UpdateRatingAsync(product.SellerId);
+
+        _logger.LogInformation("Review {ReviewId} updated by user {UserId}", reviewId, userId);
+
+        return new ReviewResponse(
+            review.Id, review.ProductId, review.UserId, review.User.FullName,
+            review.Rating, review.Comment, review.CreatedAt);
+    }
+
     public async Task DeleteAsync(int reviewId, int userId)
     {
         var review = await _reviewRepo.GetByIdAsync(reviewId, userId)

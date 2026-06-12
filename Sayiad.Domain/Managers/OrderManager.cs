@@ -115,6 +115,19 @@ public class OrderManager : IOrderManager
         return await GetByIdAsync(order.Id, userId);
     }
 
+    public async Task<PagedResult<OrderResponse>> GetAllOrdersAsync(PaginationRequest? pagination = null)
+    {
+        var p = pagination ?? new PaginationRequest();
+        var result = await _orderRepo.GetAllOrdersAsync(p);
+        return new PagedResult<OrderResponse>
+        {
+            Items = result.Items.Select(MapToResponse).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        };
+    }
+
     public async Task<PagedResult<OrderResponse>> GetUserOrdersAsync(int userId, PaginationRequest? pagination = null)
     {
         var p = pagination ?? new PaginationRequest();

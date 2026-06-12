@@ -16,6 +16,7 @@ public interface IProductManager
     Task<ProductImageResponse> AddImageAsync(int productId, int sellerId, AddProductImageRequest request);
     Task DeleteImageAsync(int productId, int imageId, int sellerId);
     Task<ProductResponse> UpdateStatusAsync(int id, ProductStatus status);
+    Task<ProductResponse> UpdateSellerStatusAsync(int productId, int sellerId, ProductStatus newStatus);
     Task<PagedResult<ProductResponse>> GetPendingReviewAsync(PaginationRequest pagination);
     Task<ProductResponse> ApproveProductAsync(int id, int adminId);
     Task<ProductResponse> RejectProductAsync(int id, int adminId, string reason);

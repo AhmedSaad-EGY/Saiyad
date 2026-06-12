@@ -6,5 +6,6 @@ public interface IReviewRepository
     Task<Review?> GetByIdAsync(int id, int? userId = null);
     Task<bool> ExistsForUserAsync(int productId, int userId);
     Task AddAsync(Review review);
+    Task UpdateAsync(Review review);
     Task DeleteAsync(Review review);
 }

@@ -7,6 +7,7 @@ namespace Sayiad.Domain.Managers;
 public interface IOrderManager
 {
     Task<OrderResponse> CreateFromCartAsync(int userId, CreateOrderRequest request);
+    Task<PagedResult<OrderResponse>> GetAllOrdersAsync(PaginationRequest? pagination = null);
     Task<PagedResult<OrderResponse>> GetUserOrdersAsync(int userId, PaginationRequest? pagination = null);
     Task<IEnumerable<OrderResponse>> GetSellerOrdersAsync(int sellerId);
     Task<OrderResponse> GetByIdAsync(int orderId, int userId);

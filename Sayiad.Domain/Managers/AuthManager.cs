@@ -54,6 +54,17 @@ public class AuthManager : IAuthManager
             UpdatedAt = DateTime.UtcNow
         };
 
+        var allowedRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            nameof(UserRole.Customer),
+            nameof(UserRole.Fisherman),
+            nameof(UserRole.BaitSeller),
+            nameof(UserRole.Auctioneer)
+        };
+
+        if (!allowedRoles.Contains(request.Role))
+            throw new InvalidOperationException($"Role '{request.Role}' is not valid for registration.");
+
         if (string.Equals(request.Role, nameof(UserRole.Auctioneer), StringComparison.OrdinalIgnoreCase))
         {
             user.Role = UserRole.Customer;

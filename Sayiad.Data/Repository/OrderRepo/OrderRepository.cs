@@ -14,6 +14,33 @@ public class OrderRepository : IOrderRepository
         _db = db;
     }
 
+    public async Task<PagedResult<CustomerOrder>> GetAllOrdersAsync(PaginationRequest pagination)
+    {
+        var query = _db.CustomerOrders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+                    .ThenInclude(p => p.Images)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Seller)
+            .Include(o => o.Buyer);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(o => o.CreatedAt)
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<CustomerOrder>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
+
     public async Task<PagedResult<CustomerOrder>> GetUserOrdersAsync(int userId, PaginationRequest pagination)
     {
         var query = _db.CustomerOrders

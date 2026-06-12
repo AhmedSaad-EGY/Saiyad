@@ -200,6 +200,37 @@ public class ProductManager : IProductManager
         return MapToResponse(product);
     }
 
+    public async Task<ProductResponse> UpdateSellerStatusAsync(int productId, int sellerId, ProductStatus newStatus)
+    {
+        var product = await _repo.GetByIdAsync(productId)
+            ?? throw new KeyNotFoundException("Product not found");
+
+        if (product.SellerId != sellerId)
+            throw new UnauthorizedAccessException("You can only update your own products");
+
+        var allowed = (product.Status, newStatus) switch
+        {
+            (ProductStatus.Available, ProductStatus.Draft) => true,
+            (ProductStatus.Available, ProductStatus.Sold) => true,
+            (ProductStatus.Draft, ProductStatus.Available) => true,
+            (ProductStatus.Draft, ProductStatus.Sold) => true,
+            _ => false
+        };
+
+        if (!allowed)
+            throw new InvalidOperationException(
+                $"Cannot change status from '{product.Status}' to '{newStatus}'. " +
+                $"Allowed transitions: Available ↔ Draft, Available → Sold, Draft → Sold.");
+
+        product.Status = newStatus;
+        product.UpdatedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(product);
+        _logger.LogInformation("Product {ProductId} status changed to {Status} by seller {SellerId}", productId, newStatus, sellerId);
+
+        return MapToResponse(product);
+    }
+
     public async Task<IEnumerable<ProductResponse>> GetSellerProductsAsync(int sellerId)
     {
         var products = await _repo.GetSellerProductsAsync(sellerId);

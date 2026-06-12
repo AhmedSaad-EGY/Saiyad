@@ -56,6 +56,14 @@ public class OrdersController : BaseController
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpGet("admin")]
+    public async Task<IActionResult> GetAllOrders([FromQuery] PaginationRequest? pagination)
+    {
+        var orders = await _orderManager.GetAllOrdersAsync(pagination);
+        return Ok(orders);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusRequest request)
     {
