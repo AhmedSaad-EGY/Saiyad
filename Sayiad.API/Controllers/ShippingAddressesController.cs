@@ -28,6 +28,15 @@ public class ShippingAddressesController : BaseController
         return Ok(addresses);
     }
 
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, CreateShippingAddressRequest request)
+    {
+        var userId = GetUserId();
+        var address = await _shippingAddressManager.UpdateAsync(userId, id, request);
+        if (address is null) return NotFound();
+        return Ok(address);
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

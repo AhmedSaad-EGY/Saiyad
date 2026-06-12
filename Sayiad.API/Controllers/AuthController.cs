@@ -6,7 +6,6 @@ namespace Sayiad.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[IgnoreAntiforgeryToken]
 public class AuthController(IAuthManager authManager) : BaseController
 {
     [HttpPost("register")]

@@ -93,6 +93,30 @@ public class ProductRepository : IProductRepository
             .ToListAsync();
     }
 
+    public async Task<PagedResult<Product>> GetSellerProductsPagedAsync(int sellerId, PaginationRequest pagination)
+    {
+        var query = _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.Images)
+            .Where(p => p.SellerId == sellerId && p.DeletedAt == null);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<Product>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
+
     public async Task AddAsync(Product product)
     {
         _db.Products.Add(product);

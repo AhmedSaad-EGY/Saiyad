@@ -29,6 +29,21 @@ public class ShippingAddressManager : IShippingAddressManager
         return MapToResponse(created);
     }
 
+    public async Task<ShippingAddressResponse?> UpdateAsync(int userId, int addressId, CreateShippingAddressRequest request)
+    {
+        var existing = await _repo.GetByIdAsync(addressId, userId);
+        if (existing is null) return null;
+
+        existing.FullName = request.FullName;
+        existing.Phone = request.Phone;
+        existing.City = request.City;
+        existing.AddressLine = request.AddressLine;
+        existing.PostalCode = request.PostalCode ?? string.Empty;
+
+        var updated = await _repo.UpdateAsync(existing);
+        return MapToResponse(updated);
+    }
+
     public async Task<bool> DeleteAsync(int userId, int addressId)
     {
         return await _repo.DeleteAsync(addressId, userId);

@@ -201,7 +201,7 @@ public class AuctionConcurrencyTests : IDisposable
         await _db.SaveChangesAsync();
 
         return new Domain.Dtos.AuctionDtos.BidResponse(
-            bid.Id, bid.UserId, "", bid.Amount,
+            bid.Id, bid.AuctionId, bid.UserId, "", bid.Amount,
             bid.IsAutoBid, bid.MaxAutoBidAmount, bid.BidStatus.ToString(), bid.CreatedAt);
     }
 

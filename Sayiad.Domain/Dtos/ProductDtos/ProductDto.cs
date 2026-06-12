@@ -7,7 +7,8 @@ public record ProductResponse(
     string Location, bool IsAuctioned, int? AuctionId, ProductStatus Status,
     int SellerId, string SellerName, int CategoryId, string CategoryName,
     string? PrimaryImageUrl, DateTime CreatedAt, DateTime UpdatedAt,
-    int? ReviewedByUserId = null, DateTime? ReviewedAt = null, string? RejectionReason = null
+    int? ReviewedByUserId = null, DateTime? ReviewedAt = null, string? RejectionReason = null,
+    List<ProductImageResponse>? Images = null
 );
 
 public record CreateProductRequest(

@@ -206,6 +206,19 @@ public class ProductManager : IProductManager
         return products.Select(MapToResponse);
     }
 
+    public async Task<PagedResult<ProductResponse>> GetMyProductsAsync(int sellerId, PaginationRequest pagination)
+    {
+        var p = pagination ?? new PaginationRequest();
+        var result = await _repo.GetSellerProductsPagedAsync(sellerId, p);
+        return new PagedResult<ProductResponse>
+        {
+            Items = result.Items.Select(MapToResponse).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        };
+    }
+
     public async Task<PagedResult<ProductResponse>> GetPendingReviewAsync(PaginationRequest pagination)
     {
         var p = pagination ?? new PaginationRequest();
@@ -280,6 +293,7 @@ public class ProductManager : IProductManager
         p.CategoryId, p.Category.Name,
         p.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
         p.CreatedAt, p.UpdatedAt,
-        p.ReviewedByUserId, p.ReviewedAt, p.RejectionReason
+        p.ReviewedByUserId, p.ReviewedAt, p.RejectionReason,
+        p.Images?.Select(i => new ProductImageResponse(i.Id, i.ProductId, i.ImageUrl, i.IsPrimary)).ToList()
     );
 }

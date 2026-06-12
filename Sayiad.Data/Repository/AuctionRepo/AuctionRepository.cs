@@ -31,6 +31,9 @@ public class AuctionRepository : IAuctionRepository
         if (filter.MaxPrice.HasValue)
             query = query.Where(a => a.CurrentHighestBid <= filter.MaxPrice);
 
+        if (filter.EndingSoon.HasValue && filter.EndingSoon.Value)
+            query = query.Where(a => a.EndTime <= DateTime.UtcNow.AddHours(24));
+
         var totalCount = await query.CountAsync();
 
         var items = await query

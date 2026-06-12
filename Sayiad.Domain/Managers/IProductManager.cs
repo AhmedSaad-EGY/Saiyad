@@ -12,6 +12,7 @@ public interface IProductManager
     Task<ProductResponse> UpdateAsync(int id, int sellerId, UpdateProductRequest request);
     Task DeleteAsync(int id, int sellerId);
     Task<IEnumerable<ProductResponse>> GetSellerProductsAsync(int sellerId);
+    Task<PagedResult<ProductResponse>> GetMyProductsAsync(int sellerId, PaginationRequest pagination);
     Task<ProductImageResponse> AddImageAsync(int productId, int sellerId, AddProductImageRequest request);
     Task DeleteImageAsync(int productId, int imageId, int sellerId);
     Task<ProductResponse> UpdateStatusAsync(int id, ProductStatus status);

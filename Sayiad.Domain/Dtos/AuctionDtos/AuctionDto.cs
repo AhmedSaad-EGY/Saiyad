@@ -18,7 +18,7 @@ public record CreateAuctionRequest(
 public record PlaceBidRequest(decimal Amount, decimal? MaxAutoBidAmount = null);
 
 /// <summary>Response returned after a bid is placed.</summary>
-public record BidResponse(int Id, int UserId, string UserName, decimal Amount, bool IsAutoBid, decimal? MaxAutoBidAmount, string Status, DateTime CreatedAt);
+public record BidResponse(int Id, int AuctionId, int UserId, string UserName, decimal Amount, bool IsAutoBid, decimal? MaxAutoBidAmount, string Status, DateTime CreatedAt);
 
 /// <summary>Wraps an auction with its full bid history.</summary>
 public record AuctionDetailResponse(AuctionResponse Auction, List<BidResponse> Bids);

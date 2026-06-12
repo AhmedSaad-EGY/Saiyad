@@ -18,7 +18,8 @@ public static class MappingConfig
             .Map(dest => dest.SellerName, src => src.Seller.FullName)
             .Map(dest => dest.CategoryName, src => src.Category.Name)
             .Map(dest => dest.PrimaryImageUrl,
-                src => src.Images.FirstOrDefault(i => i.IsPrimary)!.ImageUrl);
+                src => src.Images.FirstOrDefault(i => i.IsPrimary)!.ImageUrl)
+            .Map(dest => dest.Images, src => src.Images.Select(i => new ProductImageResponse(i.Id, i.ProductId, i.ImageUrl, i.IsPrimary)).ToList());
 
         TypeAdapterConfig<CustomerOrder, OrderResponse>.NewConfig()
             .Map(dest => dest.BuyerName, src => src.Buyer.FullName);

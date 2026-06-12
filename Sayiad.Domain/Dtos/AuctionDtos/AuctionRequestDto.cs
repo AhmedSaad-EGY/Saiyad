@@ -9,7 +9,7 @@ public record SubmitAuctionRequestRequest(
     decimal QuantityKg,
     string FishType,
     string CatchLocation,
-    DateTime CatchDate
+    DateTime? CatchDate
 );
 
 /// <summary>Auctioneer approves and sets auction parameters.</summary>

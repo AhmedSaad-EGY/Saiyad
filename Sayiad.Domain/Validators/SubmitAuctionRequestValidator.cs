@@ -13,6 +13,6 @@ public class SubmitAuctionRequestValidator : AbstractValidator<SubmitAuctionRequ
         RuleFor(x => x.QuantityKg).GreaterThan(0);
         RuleFor(x => x.FishType).NotEmpty().MaximumLength(100);
         RuleFor(x => x.CatchLocation).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.CatchDate).LessThanOrEqualTo(DateTime.UtcNow.AddDays(1));
+        RuleFor(x => x.CatchDate).LessThanOrEqualTo(DateTime.UtcNow.AddDays(1)).When(x => x.CatchDate.HasValue);
     }
 }

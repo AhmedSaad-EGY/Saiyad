@@ -34,6 +34,13 @@ public class ShippingAddressRepository : IShippingAddressRepository
             .ToListAsync();
     }
 
+    public async Task<ShippingAddress?> UpdateAsync(ShippingAddress address)
+    {
+        _db.ShippingAddresses.Update(address);
+        await _db.SaveChangesAsync();
+        return address;
+    }
+
     public async Task<bool> DeleteAsync(int id, int userId)
     {
         var address = await _db.ShippingAddresses

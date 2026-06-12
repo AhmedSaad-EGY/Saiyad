@@ -64,7 +64,7 @@ public class AuctionManager : IAuctionManager
             MapToResponse(auction),
             auction.Bids.OrderByDescending(b => b.Amount)
                 .Select(b => new BidResponse(
-                    b.Id, b.UserId, b.User!.FullName, b.Amount,
+                    b.Id, b.AuctionId, b.UserId, b.User!.FullName, b.Amount,
                     b.IsAutoBid, b.MaxAutoBidAmount, b.BidStatus.ToString(), b.CreatedAt))
                 .ToList()
         );
@@ -225,7 +225,7 @@ public class AuctionManager : IAuctionManager
             amount, auctionId, userId);
 
         return new BidResponse(
-            bid.Id, bid.UserId, string.Empty, bid.Amount,
+            bid.Id, auctionId, bid.UserId, string.Empty, bid.Amount,
             bid.IsAutoBid, bid.MaxAutoBidAmount, bid.BidStatus.ToString(), bid.CreatedAt);
     }
 
@@ -421,7 +421,7 @@ public class AuctionManager : IAuctionManager
             QuantityKg = request.QuantityKg,
             FishType = request.FishType,
             CatchLocation = request.CatchLocation,
-            CatchDate = request.CatchDate,
+            CatchDate = request.CatchDate ?? DateTime.UtcNow,
             Status = AuctionRequestStatus.Pending
         };
 

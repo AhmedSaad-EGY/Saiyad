@@ -55,10 +55,10 @@ public class ProductsController : BaseController
 
     [Authorize(Roles = $"{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
     [HttpGet("my")]
-    public async Task<IActionResult> GetMyProducts()
+    public async Task<IActionResult> GetMyProducts([FromQuery] PaginationRequest pagination)
     {
         var sellerId = GetUserId();
-        var products = await _productManager.GetSellerProductsAsync(sellerId);
+        var products = await _productManager.GetMyProductsAsync(sellerId, pagination);
         return Ok(products);
     }
 

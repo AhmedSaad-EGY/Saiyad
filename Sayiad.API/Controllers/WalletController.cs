@@ -20,7 +20,7 @@ public class WalletController : BaseController
         return Ok(wallet);
     }
 
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize]
     [HttpPost("deposit")]
     public async Task<IActionResult> Deposit([FromBody] DepositRequest request)
     {
