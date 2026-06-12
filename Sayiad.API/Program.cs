@@ -76,8 +76,8 @@ try
     builder.Services.AddCors(opt =>
         opt.AddPolicy("AllowFrontend", policy => policy
             .WithOrigins(corsOrigins)
-            .WithHeaders("Content-Type", "Authorization", "X-CSRF-Token", "Accept", "x-requested-with")
-            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
             .AllowCredentials()));
 
     // ── Rate Limiting ─────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ try
 
     app.MapControllers();
     app.MapHealthChecks("/health");
-    app.MapHub<AuctionHub>("/hubs/auction");
+    app.MapHub<AuctionHub>("/hubs/auction").RequireCors("AllowFrontend");
 
     Log.Information("Sayiad API starting.");
     app.Run();

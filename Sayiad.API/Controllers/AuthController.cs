@@ -7,20 +7,13 @@ namespace Sayiad.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [IgnoreAntiforgeryToken]
-public class AuthController : BaseController
+public class AuthController(IAuthManager authManager) : BaseController
 {
-    private readonly IAuthManager _authManager;
-
-    public AuthController(IAuthManager authManager)
-    {
-        _authManager = authManager;
-    }
-
     [HttpPost("register")]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        var result = await _authManager.RegisterAsync(request);
+        var result = await authManager.RegisterAsync(request);
         return Created("", result);
     }
 
@@ -28,7 +21,7 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
-        var result = await _authManager.LoginAsync(request);
+        var result = await authManager.LoginAsync(request);
 
         Response.Cookies.Append("sayiad_refreshToken", result.RefreshToken, new CookieOptions
         {
@@ -49,7 +42,7 @@ public class AuthController : BaseController
         if (string.IsNullOrEmpty(refreshToken))
             return Unauthorized(new { message = "Refresh token not found" });
 
-        var result = await _authManager.RefreshTokenAsync(refreshToken);
+        var result = await authManager.RefreshTokenAsync(refreshToken);
 
         Response.Cookies.Append("sayiad_refreshToken", result.RefreshToken, new CookieOptions
         {
@@ -68,14 +61,14 @@ public class AuthController : BaseController
     public async Task<IActionResult> Logout()
     {
         var userId = GetUserId();
-        await _authManager.LogoutAsync(userId);
+        await authManager.LogoutAsync(userId);
         return NoContent();
     }
 
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
     {
-        await _authManager.VerifyEmailAsync(request.Token);
+        await authManager.VerifyEmailAsync(request.Token);
         return Ok(new { message = "Email verified successfully. You can now log in." });
     }
 
@@ -83,7 +76,7 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ResendVerification(ResendVerificationRequest request)
     {
-        await _authManager.ResendVerificationAsync(request.Email);
+        await authManager.ResendVerificationAsync(request.Email);
         return Ok(new { message = "Verification email sent." });
     }
 
@@ -91,7 +84,7 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
     {
-        await _authManager.ForgotPasswordAsync(request);
+        await authManager.ForgotPasswordAsync(request);
 
         return Ok(new { message = "If that email is registered you will receive a reset code." });
     }
@@ -100,7 +93,7 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> VerifyResetCode(VerifyResetCodeRequest request)
     {
-        var result = await _authManager.VerifyResetCodeAsync(request.Email, request.Token);
+        var result = await authManager.VerifyResetCodeAsync(request.Email, request.Token);
 
         if (!result.IsSuccess)
             return BadRequest(new { message = result.Error });
@@ -112,7 +105,7 @@ public class AuthController : BaseController
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
     {
-        var result = await _authManager.ResetPasswordAsync(request);
+        var result = await authManager.ResetPasswordAsync(request);
 
         if (!result.IsSuccess)
             return BadRequest(new { message = result.Error });
@@ -125,7 +118,7 @@ public class AuthController : BaseController
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
         var userId = GetUserId();
-        await _authManager.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        await authManager.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
         return NoContent();
     }
 }
