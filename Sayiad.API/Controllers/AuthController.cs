@@ -4,9 +4,9 @@ namespace Sayiad.Api.Controllers;
 /// Handles user authentication: register, login, token refresh, logout,
 /// email verification, password reset (forgot + reset), and password change.
 /// </summary>
-[IgnoreAntiforgeryToken]
 [ApiController]
 [Route("api/[controller]")]
+[IgnoreAntiforgeryToken]
 public class AuthController : BaseController
 {
     private readonly IAuthManager _authManager;
