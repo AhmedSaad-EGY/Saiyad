@@ -55,12 +55,19 @@ try
             {
                 OnMessageReceived = ctx =>
                 {
-                    // Allow SignalR hubs to authenticate via ?access_token= query param
                     if (ctx.Request.Path.StartsWithSegments("/hubs"))
                     {
                         var token = ctx.Request.Query["access_token"];
                         if (!string.IsNullOrEmpty(token))
+                        {
                             ctx.Token = token;
+                        }
+                        else
+                        {
+                            var authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
+                            if (authHeader?.StartsWith("Bearer ") == true)
+                                ctx.Token = authHeader["Bearer ".Length..];
+                        }
                     }
                     return Task.CompletedTask;
                 }
