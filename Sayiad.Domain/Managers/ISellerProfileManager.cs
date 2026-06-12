@@ -9,4 +9,5 @@ public interface ISellerProfileManager
     Task<SellerProfileResponse> GetByUserIdAsync(int userId);
     Task<SellerProfileResponse> GetMyProfileAsync(int userId);
     Task<SellerDashboardResponse> GetDashboardAsync(int userId);
+    Task<PublicSellerProfileResponse> GetPublicProfileAsync(int userId);
 }

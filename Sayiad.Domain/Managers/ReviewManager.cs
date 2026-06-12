@@ -95,4 +95,20 @@ public class ReviewManager : IReviewManager
 
         await _reviewRepo.DeleteAsync(review);
     }
+
+    public async Task AdminDeleteAsync(int reviewId, string? reason)
+    {
+        var review = await _reviewRepo.GetByIdAsync(reviewId)
+            ?? throw new KeyNotFoundException("Review not found");
+
+        var authorId = review.UserId;
+        await _reviewRepo.DeleteAsync(review);
+
+        var message = "Your review has been removed by a moderator.";
+        if (!string.IsNullOrEmpty(reason))
+            message += $" Reason: {reason}";
+
+        await _notificationManager.CreateAsync(authorId, "Review Removed", message);
+        _logger.LogInformation("Admin deleted review {ReviewId} from user {UserId}", reviewId, authorId);
+    }
 }

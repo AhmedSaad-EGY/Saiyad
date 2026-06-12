@@ -95,6 +95,25 @@ public class SellerProfileManager : ISellerProfileManager
             totalProducts, recentOrders);
     }
 
+    public async Task<PublicSellerProfileResponse> GetPublicProfileAsync(int userId)
+    {
+        var profile = await _repo.GetByUserIdAsync(userId)
+            ?? throw new KeyNotFoundException("Seller profile not found");
+
+        var products = await _productRepo.GetSellerProductsAsync(userId);
+        var totalProducts = products.Count();
+
+        return new PublicSellerProfileResponse(
+            profile.UserId,
+            profile.User.FullName,
+            profile.StoreDescription,
+            profile.User.ProfileImage,
+            (double)profile.AverageRating,
+            totalProducts,
+            profile.CreatedAt
+        );
+    }
+
     private static SellerProfileResponse MapToResponse(SellerProfile p)
     {
         return new SellerProfileResponse(

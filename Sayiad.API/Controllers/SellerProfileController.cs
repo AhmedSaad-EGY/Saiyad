@@ -22,9 +22,9 @@ public class SellerProfileController : BaseController
 
     [HttpGet("{userId}")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetByUserId(int userId)
+    public async Task<IActionResult> GetPublicProfile(int userId)
     {
-        var profile = await _sellerProfileManager.GetByUserIdAsync(userId);
+        var profile = await _sellerProfileManager.GetPublicProfileAsync(userId);
         return Ok(profile);
     }
 

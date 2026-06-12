@@ -89,33 +89,40 @@ public class WalletManager : IWalletManager
 
     public async Task ReleaseHeldFundsAsync(int userId, decimal amount, string referenceType, int referenceId)
     {
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
-            ?? throw new KeyNotFoundException("Wallet not found");
-
-        wallet.HeldBalance -= amount;
-        if (wallet.HeldBalance < 0) wallet.HeldBalance = 0;
-        wallet.UpdatedAt = DateTime.UtcNow;
-
-        var txn = new WalletTransaction
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
         {
-            WalletId = wallet.Id,
-            Amount = amount,
-            Type = "Release",
-            ReferenceType = referenceType,
-            ReferenceId = referenceId,
-            Description = $"Funds released from {referenceType} #{referenceId}",
-            BalanceSnapshot = wallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        };
-        await _walletRepo.AddTransactionAsync(txn);
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
+                ?? throw new KeyNotFoundException("Wallet not found");
 
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            wallet.HeldBalance -= amount;
+            if (wallet.HeldBalance < 0) wallet.HeldBalance = 0;
+            wallet.UpdatedAt = DateTime.UtcNow;
 
-        _logger.LogInformation("Funds released: User {UserId}, Amount {Amount}, Ref {RefType}#{RefId}",
-            userId, amount, referenceType, referenceId);
+            var txn = new WalletTransaction
+            {
+                WalletId = wallet.Id,
+                Amount = amount,
+                Type = "Release",
+                ReferenceType = referenceType,
+                ReferenceId = referenceId,
+                Description = $"Funds released from {referenceType} #{referenceId}",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _walletRepo.AddTransactionAsync(txn);
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task TransferFundsAsync(int fromUserId, int toUserId, decimal amount, string description)
@@ -173,68 +180,82 @@ public class WalletManager : IWalletManager
 
     public async Task DeductForOrderAsync(int userId, decimal amount, int orderId)
     {
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
-            ?? throw new KeyNotFoundException("Wallet not found");
-
-        if (wallet.AvailableBalance < amount)
-            throw new InvalidOperationException("Insufficient funds for order");
-
-        wallet.Balance -= amount;
-        wallet.HeldBalance = Math.Max(0, wallet.HeldBalance - amount);
-        wallet.UpdatedAt = DateTime.UtcNow;
-
-        var txn = new WalletTransaction
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
         {
-            WalletId = wallet.Id,
-            Amount = -amount,
-            Type = "Debit",
-            ReferenceType = "Order",
-            ReferenceId = orderId,
-            Description = $"Payment for order #{orderId}",
-            BalanceSnapshot = wallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        };
-        await _walletRepo.AddTransactionAsync(txn);
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
+                ?? throw new KeyNotFoundException("Wallet not found");
 
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            if (wallet.AvailableBalance < amount)
+                throw new InvalidOperationException("Insufficient funds for order");
 
-        _logger.LogInformation("Order payment: User {UserId}, Order {OrderId}, Amount {Amount}",
-            userId, orderId, amount);
+            wallet.Balance -= amount;
+            wallet.HeldBalance = Math.Max(0, wallet.HeldBalance - amount);
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            var txn = new WalletTransaction
+            {
+                WalletId = wallet.Id,
+                Amount = -amount,
+                Type = "Debit",
+                ReferenceType = "Order",
+                ReferenceId = orderId,
+                Description = $"Payment for order #{orderId}",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _walletRepo.AddTransactionAsync(txn);
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task CreditSellerAsync(int sellerId, decimal amount, int orderId)
     {
         if (amount <= 0) throw new InvalidOperationException("Seller credit amount must be positive");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
-            ?? await GetOrCreateWalletAsync(sellerId);
-
-        wallet.Balance += amount;
-        wallet.UpdatedAt = DateTime.UtcNow;
-
-        var txn = new WalletTransaction
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
         {
-            WalletId = wallet.Id,
-            Amount = amount,
-            Type = "Credit",
-            ReferenceType = "Order",
-            ReferenceId = orderId,
-            Description = $"Payout for order #{orderId} (95%)",
-            BalanceSnapshot = wallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        };
-        await _walletRepo.AddTransactionAsync(txn);
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
+                ?? await GetOrCreateWalletAsync(sellerId);
 
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            wallet.Balance += amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
 
-        _logger.LogInformation("Seller credit: User {SellerId}, Order {OrderId}, Amount {Amount}",
-            sellerId, orderId, amount);
+            var txn = new WalletTransaction
+            {
+                WalletId = wallet.Id,
+                Amount = amount,
+                Type = "Credit",
+                ReferenceType = "Order",
+                ReferenceId = orderId,
+                Description = $"Payout for order #{orderId} (95%)",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _walletRepo.AddTransactionAsync(txn);
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task SettleAuctionPaymentAsync(int winnerId, int sellerId, decimal winningAmount, int auctionId)
@@ -295,31 +316,37 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Fee amount must be positive");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        var wallet = await _walletRepo.GetByUserIdWithLockAsync(platformUserId)
-            ?? await GetOrCreateWalletAsync(platformUserId);
-
-        wallet.Balance += amount;
-        wallet.UpdatedAt = DateTime.UtcNow;
-
-        wallet.Transactions.Add(new WalletTransaction
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
         {
-            Amount = amount,
-            Type = "PlatformFee",
-            ReferenceType = referenceType,
-            ReferenceId = referenceId,
-            Description = $"Platform fee for {referenceType} #{referenceId} (5%)",
-            BalanceSnapshot = wallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        });
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(platformUserId)
+                ?? await GetOrCreateWalletAsync(platformUserId);
 
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            wallet.Balance += amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
 
-        _logger.LogInformation(
-            "Platform fee credited: User {PlatformUserId}, Amount {Amount}, Ref {RefType}#{RefId}",
-            platformUserId, amount, referenceType, referenceId);
+            wallet.Transactions.Add(new WalletTransaction
+            {
+                Amount = amount,
+                Type = "PlatformFee",
+                ReferenceType = referenceType,
+                ReferenceId = referenceId,
+                Description = $"Platform fee for {referenceType} #{referenceId} (5%)",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task DeductForSubscriptionAsync(int userId, decimal amount, int subscriptionId)

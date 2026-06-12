@@ -26,7 +26,7 @@ public class ReviewsController : BaseController
         return Ok(rating);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateReviewRequest request)
     {
@@ -35,12 +35,20 @@ public class ReviewsController : BaseController
         return CreatedAtAction(nameof(GetProductReviews), new { productId = request.ProductId }, review);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var userId = GetUserId();
         await _reviewManager.DeleteAsync(id, userId);
+        return NoContent();
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpDelete("{id}/admin")]
+    public async Task<IActionResult> AdminDeleteReview(int id, [FromBody] AdminDeleteReviewRequest request)
+    {
+        await _reviewManager.AdminDeleteAsync(id, request.Reason);
         return NoContent();
     }
 }

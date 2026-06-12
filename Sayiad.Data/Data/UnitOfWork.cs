@@ -8,6 +8,8 @@ public class UnitOfWork : IUnitOfWork
 
     public UnitOfWork(ApplicationDbContext db) => _db = db;
 
+    public IDbContextTransaction? CurrentTransaction => _db.Database.CurrentTransaction;
+
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
         => await _db.SaveChangesAsync(ct);
 

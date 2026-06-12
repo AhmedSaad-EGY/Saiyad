@@ -61,4 +61,20 @@ public class UsersController : BaseController
         await _userManager.ToggleUserStatusAsync(id);
         return NoContent();
     }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPatch("{id}/approve-role-request")]
+    public async Task<IActionResult> ApproveRoleRequest(int id)
+    {
+        await _userManager.ApproveRoleRequestAsync(id);
+        return Ok(new { message = "Role request approved." });
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPatch("{id}/reject-role-request")]
+    public async Task<IActionResult> RejectRoleRequest(int id, [FromBody] RejectRoleRequestDto request)
+    {
+        await _userManager.RejectRoleRequestAsync(id, request.Reason);
+        return Ok(new { message = "Role request rejected." });
+    }
 }

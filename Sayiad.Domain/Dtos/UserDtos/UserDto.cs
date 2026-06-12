@@ -7,6 +7,7 @@ public record UserResponse(
     string Phone,
     string? ProfileImage,
     string Role,
+    string? RequestedRole,
     bool IsActive,
     DateTime CreatedAt
     );
@@ -24,6 +25,7 @@ public record UserAdminResponse(
     string Phone,
     string? ProfileImage,
     string Role,
+    string? RequestedRole,
     bool IsActive,
     DateTime CreatedAt,
     DateTime UpdatedAt

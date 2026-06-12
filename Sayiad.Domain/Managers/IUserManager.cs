@@ -10,4 +10,6 @@ public interface IUserManager
     Task<PagedResult<UserAdminResponse>> GetAllUsersAsync(PaginationRequest? pagination = null);
     Task<UserAdminResponse> GetUserByIdAsync(int userId);
     Task ToggleUserStatusAsync(int userId);
+    Task ApproveRoleRequestAsync(int userId);
+    Task RejectRoleRequestAsync(int userId, string? reason);
 }

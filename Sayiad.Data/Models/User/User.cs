@@ -8,6 +8,7 @@ namespace Sayiad.Data.Models;
         public string Phone { get; set; } = null!;
         public string? ProfileImage { get; set; }
         public UserRole Role { get; set; }
+        public UserRole? RequestedRole { get; set; }
         public bool IsActive { get; set; } = true;
         public bool IsEmailVerified { get; set; }
         public string? EmailVerificationToken { get; set; }

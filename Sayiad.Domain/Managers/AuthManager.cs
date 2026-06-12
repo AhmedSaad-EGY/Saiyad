@@ -37,9 +37,6 @@ public class AuthManager : IAuthManager
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
-        // B-002: Override any client-provided role — public registrations are always Customer
-        const UserRole fixedRole = UserRole.Customer;
-
         if (await _userRepo.EmailExistsAsync(request.Email))
             throw new InvalidOperationException("Email already registered");
 
@@ -49,7 +46,6 @@ public class AuthManager : IAuthManager
             Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Phone = InputSanitizer.SanitizeNullable(request.Phone),
-            Role = fixedRole,
             IsActive = true,
             IsEmailVerified = false,
             LicenseNumber = InputSanitizer.SanitizeNullable(request.LicenseNumber),
@@ -57,6 +53,17 @@ public class AuthManager : IAuthManager
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
+        if (string.Equals(request.Role, nameof(UserRole.Auctioneer), StringComparison.OrdinalIgnoreCase))
+        {
+            user.Role = UserRole.Customer;
+            user.RequestedRole = UserRole.Auctioneer;
+        }
+        else
+        {
+            user.Role = Enum.Parse<UserRole>(request.Role);
+            user.RequestedRole = null;
+        }
 
         var rawVerificationToken = Guid.NewGuid().ToString("N");
         user.EmailVerificationToken = HashToken(rawVerificationToken);
@@ -294,7 +301,8 @@ public class AuthManager : IAuthManager
             Token: token,
             RefreshToken: refreshToken,
             ExpiresAt: expiry,
-            User: MapUser(user)
+            User: MapUser(user),
+            PendingRoleUpgrade: user.RequestedRole?.ToString()
         );
     }
 

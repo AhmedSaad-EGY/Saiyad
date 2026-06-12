@@ -29,6 +29,16 @@ public record SellerProfileResponse(
     int TotalSales
 );
 
+public record PublicSellerProfileResponse(
+    int UserId,
+    string SellerName,
+    string? Description,
+    string? AvatarUrl,
+    double Rating,
+    int TotalProducts,
+    DateTime MemberSince
+);
+
 public record DashboardOrderItem(
     int OrderId,
     string BuyerName,

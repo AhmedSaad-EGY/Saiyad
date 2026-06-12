@@ -8,4 +8,5 @@ public interface IReviewManager
     Task<ProductRatingResponse> GetProductRatingAsync(int productId);
     Task<ReviewResponse> CreateAsync(int userId, CreateReviewRequest request);
     Task DeleteAsync(int reviewId, int userId);
+    Task AdminDeleteAsync(int reviewId, string? reason);
 }
