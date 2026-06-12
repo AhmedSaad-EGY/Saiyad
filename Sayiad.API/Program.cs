@@ -69,16 +69,6 @@ try
 
     builder.Services.AddAuthorization();
 
-    // ── CSRF (double-submit cookie) ───────────────────────────────────────────
-    builder.Services.AddAntiforgery(opt =>
-    {
-        opt.HeaderName = "X-CSRF-Token";
-        opt.Cookie.Name = "XSRF-TOKEN";
-        opt.Cookie.HttpOnly = false;                     // JS must be able to read the value
-        opt.Cookie.SameSite = SameSiteMode.None;
-        opt.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    });
-
     // ── CORS ──────────────────────────────────────────────────────────────────
     var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
         ?? throw new InvalidOperationException("CORS origins not configured.");
@@ -86,7 +76,7 @@ try
     builder.Services.AddCors(opt =>
         opt.AddPolicy("AllowFrontend", policy => policy
             .WithOrigins(corsOrigins)
-            .WithHeaders("Content-Type", "Authorization", "X-CSRF-Token", "Accept")
+            .WithHeaders("Content-Type", "Authorization", "X-CSRF-Token", "Accept", "x-requested-with")
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
             .AllowCredentials()));
 
@@ -174,7 +164,6 @@ try
     builder.Services.AddHostedService<AuctionExpiryService>();
 
     builder.Services.AddTransient<Sayiad.Api.Middleware.ExceptionMiddleware>();
-    builder.Services.AddTransient<Sayiad.Api.Middleware.CsrfValidationMiddleware>();
 
     // ═════════════════════════════════════════════════════════════════════════
     var app = builder.Build();
@@ -294,7 +283,6 @@ try
     app.UseRateLimiter();            // ⑧
     app.UseAuthentication();         // ⑨
     app.UseAuthorization();          // ⑩
-    app.UseMiddleware<Sayiad.Api.Middleware.CsrfValidationMiddleware>(); // ⑪ post-auth
 
     app.MapControllers();
     app.MapHealthChecks("/health");
