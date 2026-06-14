@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sayiad.Data.Common;
 using Sayiad.Data.Data;
+using Sayiad.Domain.Constants;
 using Sayiad.Domain.Contracts;
 using Sayiad.Domain.Dtos.AuctionDtos;
 
@@ -313,25 +314,93 @@ public class AuctionManager : IAuctionManager
         if (auction.Status != AuctionStatus.Active)
             throw new InvalidOperationException("Auction is already finished or cancelled");
 
-        auction.Status = AuctionStatus.Finished;
-
         var winningBid = auction.Bids
             .Where(b => b.BidStatus == BidStatus.Winning)
             .MaxBy(b => b.Amount);
 
-        if (winningBid != null && winningBid.Amount >= auction.ReservePrice)
+        if (winningBid != null && auction.ReservePrice > 0 && winningBid.Amount < auction.ReservePrice)
         {
-            auction.WinnerUserId = winningBid.UserId;
+            auction.Status = AuctionStatus.PendingSellerConfirmation;
+            auction.ConfirmationDeadline = DateTime.UtcNow.AddHours(24);
+            await _unitOfWork.SaveChangesAsync();
 
             if (auction.Product != null)
-            {
-                auction.Product.Status = ProductStatus.Sold;
-            }
+                await _notificationManager.CreateAsync(
+                    auction.Product.SellerId,
+                    "Reserve Price Not Met",
+                    $"Your auction #{auction.Id} ended with a highest bid of {winningBid.Amount:N2} EGP, " +
+                    $"which is below your reserve price of {auction.ReservePrice:N2} EGP. " +
+                    "Do you accept this bid? You have 24 hours to respond. " +
+                    "If no response, the auction will be cancelled.");
+
+            _logger.LogInformation(
+                "Auction {AuctionId} awaiting seller reserve confirmation until {Deadline}",
+                auction.Id, auction.ConfirmationDeadline);
+
+            return MapToResponse(auction);
         }
+
+        auction.Status = AuctionStatus.Finished;
+
+        if (winningBid != null)
+            await SettleAuctionAsync(auction, winningBid);
+        else
+            await _unitOfWork.SaveChangesAsync();
+
+        _logger.LogInformation("Auction ended: {AuctionId}, winner: {WinnerId}",
+            auctionId, auction.WinnerUserId);
+
+        return MapToResponse(auction);
+    }
+
+    public async Task ConfirmReservePriceBidAsync(int auctionId, bool accept, int fishermanId)
+    {
+        var auction = await _auctionRepo.GetByIdWithDetailsAsync(auctionId)
+            ?? throw new KeyNotFoundException("Auction not found");
+
+        if (auction.Product?.SellerId != fishermanId)
+            throw new UnauthorizedAccessException("Only the auction seller can confirm the bid");
+
+        if (auction.Status != AuctionStatus.PendingSellerConfirmation)
+            throw new InvalidOperationException("Auction is not awaiting seller confirmation");
+
+        var winningBid = auction.Bids
+            .Where(b => b.BidStatus == BidStatus.Winning)
+            .MaxBy(b => b.Amount)
+            ?? throw new InvalidOperationException("Auction has no winning bid to confirm");
+
+        if (accept)
+        {
+            auction.Status = AuctionStatus.Finished;
+            await SettleAuctionAsync(auction, winningBid);
+
+            await _notificationManager.CreateAsync(
+                winningBid.UserId,
+                "Seller Accepted Your Bid",
+                $"The seller accepted your bid for auction #{auction.Id}.");
+        }
+        else
+        {
+            auction.Status = AuctionStatus.Cancelled;
+            auction.ConfirmationDeadline = null;
+            await _unitOfWork.SaveChangesAsync();
+
+            await ReleaseActiveBidHoldsAsync(auction);
+            await NotifyAllBiddersAuctionCancelledAsync(auction);
+        }
+    }
+
+    private async Task SettleAuctionAsync(Auction auction, Bid winningBid)
+    {
+        auction.WinnerUserId = winningBid.UserId;
+        auction.ConfirmationDeadline = null;
+
+        if (auction.Product != null)
+            auction.Product.Status = ProductStatus.Sold;
 
         await _unitOfWork.SaveChangesAsync();
 
-        if (auction.WinnerUserId.HasValue && winningBid != null && auction.Product != null)
+        if (auction.Product != null)
         {
             await _walletManager.SettleAuctionPaymentAsync(
                 winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id, auction.CreatedByUserId);
@@ -339,18 +408,15 @@ public class AuctionManager : IAuctionManager
             var auctioneer = await _userRepo.GetByIdAsync(auction.CreatedByUserId);
             if (auctioneer != null)
             {
-                var fee = winningBid.Amount * 0.05m;
+                var fee = winningBid.Amount * FinancialConstants.AuctionAuctioneerFee;
                 await _walletManager.CreditPlatformFeeAsync(auctioneer.Id, fee, "Auction", auction.Id);
             }
         }
 
-        if (auction.WinnerUserId.HasValue)
-        {
-            await _notificationManager.CreateAsync(auction.WinnerUserId.Value, "Auction Won",
-                $"You won auction #{auctionId}!");
-        }
+        await _notificationManager.CreateAsync(winningBid.UserId, "Auction Won",
+            $"You won auction #{auction.Id}!");
 
-        if (auction.WinnerUserId.HasValue && auction.Winner != null)
+        if (auction.Winner != null)
         {
             await _emailService.SendAsync(
                 auction.Winner.Email,
@@ -358,32 +424,40 @@ public class AuctionManager : IAuctionManager
                 $@"<p>Hello {auction.Winner.FullName},</p>
                    <p>Congratulations! You won the auction for
                    <strong>{auction.Product?.Title ?? "Item"}</strong>.</p>
-                   <p>Winning bid: <strong>{winningBid?.Amount:N2} EGP</strong></p>
-                   <p>Payment of {winningBid?.Amount:N2} EGP has been deducted from your wallet."
+                   <p>Winning bid: <strong>{winningBid.Amount:N2} EGP</strong></p>
+                   <p>Payment of {winningBid.Amount:N2} EGP has been deducted from your wallet."
                    + (auction.Product != null
-                       ? $" The seller will receive 95% ({winningBid?.Amount * 0.95m:N2} EGP).</p>"
+                       ? $" The seller will receive {FinancialConstants.AuctionFishermanShare:P1} ({winningBid.Amount * FinancialConstants.AuctionFishermanShare:N2} EGP).</p>"
                        : "</p>"));
         }
 
         if (auction.Product != null)
         {
-            var winningAmount = winningBid?.Amount ?? 0;
-            var sellerAmount = winningAmount * 0.95m;
+            var sellerAmount = winningBid.Amount * FinancialConstants.AuctionFishermanShare;
             await _notificationManager.CreateAsync(auction.Product.SellerId, "Auction Ended",
-                $"Your auction for '{auction.Product.Title}' has ended. Winning bid: {winningAmount} EGP. "
-                + $"You received {sellerAmount:N2} EGP (95% after 5% auctioneer fee).");
+                $"Your auction for '{auction.Product.Title}' has ended. Winning bid: {winningBid.Amount} EGP. "
+                + $"You received {sellerAmount:N2} EGP ({FinancialConstants.AuctionFishermanShare:P1} after platform and auctioneer fees).");
         }
+    }
 
-        if (auction.WinnerUserId == null && winningBid != null)
-        {
-            await _walletManager.ReleaseHeldFundsAsync(
-                winningBid.UserId, winningBid.Amount, "Auction", auctionId);
-        }
+    private async Task ReleaseActiveBidHoldsAsync(Auction auction)
+    {
+        var heldBids = auction.Bids
+            .Where(b => b.BidStatus == BidStatus.Winning)
+            .GroupBy(b => b.UserId)
+            .Select(g => new { UserId = g.Key, Amount = g.Max(b => b.Amount) });
 
-        _logger.LogInformation("Auction ended: {AuctionId}, winner: {WinnerId}",
-            auctionId, auction.WinnerUserId);
+        foreach (var bid in heldBids)
+            await _walletManager.ReleaseHeldFundsAsync(bid.UserId, bid.Amount, "Auction", auction.Id);
+    }
 
-        return MapToResponse(auction);
+    private async Task NotifyAllBiddersAuctionCancelledAsync(Auction auction)
+    {
+        foreach (var bidderId in auction.Bids.Select(b => b.UserId).Distinct())
+            await _notificationManager.CreateAsync(
+                bidderId,
+                "Auction Cancelled",
+                $"Auction #{auction.Id} was cancelled and any held funds have been released.");
     }
 
     // ── Auction request system ──────────────────────────────────────

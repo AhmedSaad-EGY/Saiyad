@@ -78,6 +78,12 @@ public class AuctionRepository : IAuctionRepository
         await _db.SaveChangesAsync();
     }
 
+    public async Task UpdateAsync(Auction auction)
+    {
+        _db.Auctions.Update(auction);
+        await _db.SaveChangesAsync();
+    }
+
     public async Task<int> GetUserMonthlyAuctionCountAsync(int userId)
     {
         var now = DateTime.UtcNow;
@@ -112,6 +118,18 @@ public class AuctionRepository : IAuctionRepository
             .Where(a => a.Status == AuctionStatus.Active
                      && a.EndTime <= DateTime.UtcNow)
             .Include(a => a.Bids)
+            .Include(a => a.Product)
+            .Include(a => a.Winner)
+            .ToListAsync();
+    }
+
+    public async Task<List<Auction>> GetExpiredPendingConfirmationsAsync(DateTime cutoff)
+    {
+        return await _db.Auctions
+            .Where(a => a.Status == AuctionStatus.PendingSellerConfirmation
+                     && a.ConfirmationDeadline != null
+                     && a.ConfirmationDeadline < cutoff)
+            .Include(a => a.Bids).ThenInclude(b => b.User)
             .Include(a => a.Product)
             .Include(a => a.Winner)
             .ToListAsync();

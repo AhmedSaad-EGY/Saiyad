@@ -10,6 +10,7 @@ public interface IAuctionManager
     Task<AuctionResponse> CreateAsync(int userId, CreateAuctionRequest request);
     Task<BidResponse> PlaceBidAsync(int auctionId, int userId, PlaceBidRequest request);
     Task<AuctionResponse> EndAuctionAsync(int auctionId, int userId);
+    Task ConfirmReservePriceBidAsync(int auctionId, bool accept, int fishermanId);
 
     // Auction request system
     Task<AuctionRequestResponse> SubmitRequestAsync(int fishermanId, SubmitAuctionRequestRequest request);

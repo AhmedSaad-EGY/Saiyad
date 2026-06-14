@@ -6,6 +6,7 @@ using Sayiad.Data.Data;
 using Sayiad.Data.Models;
 using Sayiad.Data.Repository.SystemWalletRepo;
 using Sayiad.Data.Repository.WalletRepo;
+using Sayiad.Domain.Constants;
 using Sayiad.Domain.Dtos.WalletDtos;
 using Sayiad.Domain.Managers;
 using Xunit;
@@ -120,11 +121,11 @@ public class WalletManagerTests
 
         await CreateManager().CreditSellerAsync(SellerId, amount, orderId);
 
-        wallet.Balance.Should().Be(100m + amount * 0.95m);
+        wallet.Balance.Should().Be(100m + amount * FinancialConstants.ProductSellerShare);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _walletRepoMock.Verify(r => r.AddTransactionAsync(It.Is<WalletTransaction>(
             t => t.Type == TransactionType.SellerCreditHeld
-              && t.Amount == amount * 0.95m
+              && t.Amount == amount * FinancialConstants.ProductSellerShare
               && t.ReferenceType == "Order"
               && t.ReferenceId == orderId
         )), Times.Once);
@@ -147,7 +148,7 @@ public class WalletManagerTests
 
         await CreateManager().CreditSellerAsync(SellerId, amount, orderId);
 
-        wallet.Balance.Should().Be(amount * 0.95m);
+        wallet.Balance.Should().Be(amount * FinancialConstants.ProductSellerShare);
         _walletRepoMock.Verify(r => r.CreateAsync(It.Is<Wallet>(w => w.UserId == SellerId)), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _walletRepoMock.Verify(r => r.AddTransactionAsync(It.Is<WalletTransaction>(t => t.Type == TransactionType.SellerCreditHeld)), Times.Once);

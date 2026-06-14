@@ -65,6 +65,20 @@ public class AuctionsController : BaseController
         return Ok(auction);
     }
 
+    [Authorize(Roles = nameof(UserRole.Fisherman))]
+    [HttpPatch("{id}/confirm-reserve")]
+    public async Task<IActionResult> ConfirmReserveBid(int id, ConfirmReserveRequest request)
+    {
+        var userId = GetUserId();
+        await _auctionManager.ConfirmReservePriceBidAsync(id, request.Accept, userId);
+        await _hubContext.Clients.Group($"auction-{id}").SendAsync("ReserveBidConfirmed", new
+        {
+            auctionId = id,
+            accepted = request.Accept
+        });
+        return Ok();
+    }
+
     // ── FISHERMAN: Auction requests ────────────────────────────────
 
     [Authorize(Roles = nameof(UserRole.Fisherman))]

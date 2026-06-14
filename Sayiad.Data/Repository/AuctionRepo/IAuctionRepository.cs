@@ -9,7 +9,9 @@ public interface IAuctionRepository
     Task<Auction?> GetByIdWithBidsAsync(int auctionId);
     Task<Auction?> GetByIdWithDetailsAsync(int auctionId);
     Task AddAsync(Auction auction);
+    Task UpdateAsync(Auction auction);
     Task<List<Auction>> GetExpiredActiveAsync();
+    Task<List<Auction>> GetExpiredPendingConfirmationsAsync(DateTime cutoff);
     Task<int> GetUserMonthlyAuctionCountAsync(int userId);
     Task<int> GetUserMonthlyBidCountAsync(int userId);
     Task<int> GetUserMonthlyRequestCountAsync(int userId);

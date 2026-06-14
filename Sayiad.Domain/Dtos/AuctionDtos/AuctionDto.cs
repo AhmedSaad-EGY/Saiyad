@@ -17,6 +17,9 @@ public record CreateAuctionRequest(
 /// <summary>Request to place a bid. Set MaxAutoBidAmount to enable automatic bidding up to that amount.</summary>
 public record PlaceBidRequest(decimal Amount, decimal? MaxAutoBidAmount = null);
 
+/// <summary>Seller response when an auction ends below reserve price.</summary>
+public record ConfirmReserveRequest(bool Accept);
+
 /// <summary>Response returned after a bid is placed.</summary>
 public record BidResponse(int Id, int AuctionId, int UserId, string UserName, decimal Amount, bool IsAutoBid, decimal? MaxAutoBidAmount, string Status, DateTime CreatedAt);
 

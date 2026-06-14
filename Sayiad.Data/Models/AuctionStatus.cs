@@ -4,5 +4,7 @@ namespace Sayiad.Data.Models;
         Active,
         Finished,
         Cancelled,
-        Scheduled
+        Scheduled,
+        PendingSellerConfirmation,
+        ConfirmationExpired
     }
