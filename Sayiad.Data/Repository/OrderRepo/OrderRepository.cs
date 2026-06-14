@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sayiad.Data.Common;
 using Sayiad.Data.Data;
-using Sayiad.Data.Repository.OrderRepo;
+using Sayiad.Data.Models;
 
 namespace Sayiad.Data.Repository.OrderRepo;
 
@@ -14,9 +14,9 @@ public class OrderRepository : IOrderRepository
         _db = db;
     }
 
-    public async Task<PagedResult<CustomerOrder>> GetAllOrdersAsync(PaginationRequest pagination)
+    public async Task<PagedResult<Order>> GetAllOrdersAsync(PaginationRequest pagination)
     {
-        var query = _db.CustomerOrders
+        var query = _db.Orders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
                     .ThenInclude(p => p.Images)
@@ -32,7 +32,7 @@ public class OrderRepository : IOrderRepository
             .Take(pagination.PageSize)
             .ToListAsync();
 
-        return new PagedResult<CustomerOrder>
+        return new PagedResult<Order>
         {
             Items = items,
             TotalCount = totalCount,
@@ -41,9 +41,9 @@ public class OrderRepository : IOrderRepository
         };
     }
 
-    public async Task<PagedResult<CustomerOrder>> GetUserOrdersAsync(int userId, PaginationRequest pagination)
+    public async Task<PagedResult<Order>> GetUserOrdersAsync(int userId, PaginationRequest pagination)
     {
-        var query = _db.CustomerOrders
+        var query = _db.Orders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
                     .ThenInclude(p => p.Images)
@@ -60,7 +60,7 @@ public class OrderRepository : IOrderRepository
             .Take(pagination.PageSize)
             .ToListAsync();
 
-        return new PagedResult<CustomerOrder>
+        return new PagedResult<Order>
         {
             Items = items,
             TotalCount = totalCount,
@@ -69,9 +69,9 @@ public class OrderRepository : IOrderRepository
         };
     }
 
-    public async Task<IEnumerable<CustomerOrder>> GetSellerOrdersAsync(int sellerId)
+    public async Task<IEnumerable<Order>> GetSellerOrdersAsync(int sellerId)
     {
-        return await _db.CustomerOrders
+        return await _db.Orders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
                     .ThenInclude(p => p.Images)
@@ -83,9 +83,9 @@ public class OrderRepository : IOrderRepository
             .ToListAsync();
     }
 
-    public async Task<CustomerOrder?> GetByIdAsync(int orderId, int userId)
+    public async Task<Order?> GetByIdAsync(int orderId, int userId)
     {
-        return await _db.CustomerOrders
+        return await _db.Orders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
                     .ThenInclude(p => p.Images)
@@ -96,9 +96,9 @@ public class OrderRepository : IOrderRepository
                 (o.BuyerId == userId || o.OrderItems.Any(oi => oi.SellerId == userId)));
     }
 
-    public async Task<CustomerOrder?> GetByIdForAdminAsync(int orderId)
+    public async Task<Order?> GetByIdForAdminAsync(int orderId)
     {
-        return await _db.CustomerOrders
+        return await _db.Orders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
                     .ThenInclude(p => p.Images)
@@ -108,15 +108,15 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.Id == orderId);
     }
 
-    public async Task AddAsync(CustomerOrder order)
+    public async Task AddAsync(Order order)
     {
-        _db.CustomerOrders.Add(order);
+        _db.Orders.Add(order);
         await _db.SaveChangesAsync();
     }
 
-    public async Task UpdateAsync(CustomerOrder order)
+    public async Task UpdateAsync(Order order)
     {
-        _db.CustomerOrders.Update(order);
+        _db.Orders.Update(order);
         await _db.SaveChangesAsync();
     }
 
@@ -126,7 +126,22 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(a => a.Id == addressId && a.UserId == userId);
     }
 
-    public async Task<CustomerOrder> CreateOrderTransactionAsync(CustomerOrder order, int userId)
+    public async Task<List<Order>> GetPendingReturnRequestsAsync(DateTime cutoff)
+    {
+        return await _db.Orders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+                    .ThenInclude(p => p.Images)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Seller)
+            .Include(o => o.Buyer)
+            .Where(o => o.Status == OrderStatus.ReturnRequested
+                     && o.DeliveredAt.HasValue
+                     && o.DeliveredAt.Value < cutoff)
+            .ToListAsync();
+    }
+
+    public async Task<Order> CreateOrderTransactionAsync(Order order, int userId)
     {
         foreach (var item in order.OrderItems)
         {
@@ -137,7 +152,7 @@ public class OrderRepository : IOrderRepository
                 product.Status = ProductStatus.Sold;
         }
 
-        _db.CustomerOrders.Add(order);
+        _db.Orders.Add(order);
 
         var cart = await _db.Carts
             .Include(c => c.CartItems)

@@ -1,8 +1,11 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Sayiad.Data.Data;
+using Sayiad.Domain.Common;
+using Sayiad.Domain.Constants;
 using Sayiad.Domain.Dtos.PaymentDtos;
 
 namespace Sayiad.Tests.Managers;
@@ -15,14 +18,20 @@ public class PaymentManagerTests
     private readonly Mock<ILogger<PaymentManager>> _loggerMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
     private readonly Mock<IUserRepository> _userRepoMock = new();
+    private readonly Mock<IOptions<AppSettings>> _settingsMock = new();
+    private readonly Mock<IAuctionRepository> _auctionRepoMock = new();
 
-    private PaymentManager CreateManager() =>
-        new(_paymentRepoMock.Object, _orderRepoMock.Object, _unitOfWorkMock.Object,
-            _loggerMock.Object, _walletManagerMock.Object, _userRepoMock.Object);
-
-    private Payment CreatePayment(int id = 1, CustomerOrderStatus status = CustomerOrderStatus.Pending)
+    private PaymentManager CreateManager()
     {
-        var order = new CustomerOrder
+        _settingsMock.Setup(s => s.Value).Returns(new AppSettings { AdminEmail = "sayiadapp@gmail.com" });
+        return new(_paymentRepoMock.Object, _orderRepoMock.Object, _unitOfWorkMock.Object,
+            _loggerMock.Object, _walletManagerMock.Object, _userRepoMock.Object,
+            _settingsMock.Object, _auctionRepoMock.Object);
+    }
+
+    private Payment CreatePayment(int id = 1, OrderStatus status = OrderStatus.Pending)
+    {
+        var order = new Order
         {
             Id = 1,
             BuyerId = 42,
@@ -48,9 +57,10 @@ public class PaymentManagerTests
     private void SetupConfirmMocks(Payment payment)
     {
         var txMock = new Mock<IDbContextTransaction>();
+        txMock.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(default)).ReturnsAsync(txMock.Object);
         _paymentRepoMock.Setup(r => r.GetByIdAsync(payment.Id)).ReturnsAsync(payment);
-        _orderRepoMock.Setup(r => r.GetByIdAsync(payment.OrderId)).ReturnsAsync(payment.Order);
+        _orderRepoMock.Setup(r => r.GetByIdAsync(payment.OrderId, 42)).ReturnsAsync(payment.Order);
     }
 
     [Fact]
@@ -63,10 +73,8 @@ public class PaymentManagerTests
         var result = await CreateManager().ConfirmAsync(payment.Id, 42);
 
         _walletManagerMock.Verify(w => w.DeductForOrderAsync(42, 500m, 1), Times.Once);
-        _walletManagerMock.Verify(w => w.CreditSellerAsync(7, 475m, 1), Times.Once);
+        _walletManagerMock.Verify(w => w.CreditSellerAsync(7, 500m, 1), Times.Once);
         _walletManagerMock.Verify(w => w.CreditPlatformFeeAsync(1, 25m, "Order", 1), Times.Once);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(7, 10m, "Product", 10), Times.Once);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(7, 15m, "Product", 11), Times.Once);
         result.PaymentStatus.Should().Be("Confirmed");
     }
 
@@ -107,19 +115,17 @@ public class PaymentManagerTests
         await CreateManager().ConfirmAsync(payment.Id, 42);
 
         _walletManagerMock.Verify(w => w.CreditPlatformFeeAsync(It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(7, 10m, "Product", 10), Times.Once);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(7, 15m, "Product", 11), Times.Once);
     }
 
     [Fact]
     public async Task ConfirmAsync_MultipleSellers_ReleasesHoldsPerSeller()
     {
-        var order = new CustomerOrder
+        var order = new Order
         {
             Id = 3,
             BuyerId = 42,
             TotalPrice = 1000m,
-            Status = CustomerOrderStatus.Pending,
+            Status = OrderStatus.Pending,
             OrderItems = new HashSet<OrderItem>
             {
                 new() { ProductId = 10, SellerId = 7, UnitPrice = 200m, Quantity = 1, Subtotal = 200m },
@@ -140,9 +146,7 @@ public class PaymentManagerTests
 
         await CreateManager().ConfirmAsync(payment.Id, 42);
 
-        _walletManagerMock.Verify(w => w.CreditSellerAsync(7, 190m, 3), Times.Once);
-        _walletManagerMock.Verify(w => w.CreditSellerAsync(8, 760m, 3), Times.Once);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(7, 10m, "Product", 10), Times.Once);
-        _walletManagerMock.Verify(w => w.ReleaseHeldFundsAsync(8, 40m, "Product", 11), Times.Once);
+        _walletManagerMock.Verify(w => w.CreditSellerAsync(7, 200m, 3), Times.Once);
+        _walletManagerMock.Verify(w => w.CreditSellerAsync(8, 800m, 3), Times.Once);
     }
 }

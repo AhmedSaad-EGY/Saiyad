@@ -16,4 +16,5 @@ global using Sayiad.Data.Repository.SubscriptionRepo;
 global using Sayiad.Data.Repository.UserRepo;
 global using Sayiad.Data.Repository.WishlistRepo;
 global using Sayiad.Data.Repository.WalletRepo;
+global using Sayiad.Data.Repository.SystemWalletRepo;
 global using Sayiad.Data.Repository.SubscriptionPlanRepo;

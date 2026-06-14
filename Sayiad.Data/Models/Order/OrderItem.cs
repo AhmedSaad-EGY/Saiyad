@@ -10,7 +10,7 @@ namespace Sayiad.Data.Models;
         public decimal Subtotal { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public CustomerOrder Order { get; set; } = null!;
+        public Order Order { get; set; } = null!;
         public Product Product { get; set; } = null!;
         public User Seller { get; set; } = null!;
     }

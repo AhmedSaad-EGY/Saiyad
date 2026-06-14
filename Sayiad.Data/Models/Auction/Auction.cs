@@ -8,12 +8,14 @@ namespace Sayiad.Data.Models;
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public decimal StartingPrice { get; set; }
-        public decimal ReservePrice { get; set; }
-        public decimal MinimumIncrement { get; set; }
-        public decimal CurrentHighestBid { get; set; }
-        public AuctionStatus Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public byte[] RowVersion { get; set; } = null!;
+    public decimal ReservePrice { get; set; }
+    public decimal BidIncrement { get; set; }
+    public decimal CurrentHighestBid { get; set; }
+    public AuctionStatus Status { get; set; }
+    public bool IsProcessing { get; set; }
+    public DateTime? ConfirmationDeadline { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
 
         public Product? Product { get; set; }
         public User? CreatedByUser { get; set; }

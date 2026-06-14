@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Sayiad.Data.Data;
+using Sayiad.Domain.Constants;
 using Sayiad.Domain.Dtos.WalletDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -7,12 +8,18 @@ namespace Sayiad.Domain.Managers;
 public class WalletManager : IWalletManager
 {
     private readonly IWalletRepository _walletRepo;
+    private readonly ISystemWalletRepository _systemWalletRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<WalletManager> _logger;
 
-    public WalletManager(IWalletRepository walletRepo, IUnitOfWork unitOfWork, ILogger<WalletManager> logger)
+    public WalletManager(
+        IWalletRepository walletRepo,
+        ISystemWalletRepository systemWalletRepo,
+        IUnitOfWork unitOfWork,
+        ILogger<WalletManager> logger)
     {
         _walletRepo = walletRepo;
+        _systemWalletRepo = systemWalletRepo;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -39,7 +46,7 @@ public class WalletManager : IWalletManager
         {
             WalletId = wallet.Id,
             Amount = amount,
-            Type = "Deposit",
+            Type = TransactionType.Deposit,
             ReferenceType = "Deposit",
             Description = $"Deposited {amount:N2} EGP",
             BalanceSnapshot = wallet.Balance,
@@ -73,7 +80,7 @@ public class WalletManager : IWalletManager
         {
             WalletId = wallet.Id,
             Amount = -amount,
-            Type = "Withdrawal",
+            Type = TransactionType.Withdrawal,
             ReferenceType = "Withdrawal",
             Description = $"Withdrew {amount:N2} EGP",
             BalanceSnapshot = wallet.Balance,
@@ -105,7 +112,7 @@ public class WalletManager : IWalletManager
         {
             WalletId = wallet.Id,
             Amount = -amount,
-            Type = "Hold",
+            Type = TransactionType.HoldDeduction,
             ReferenceType = referenceType,
             ReferenceId = referenceId,
             Description = $"Funds held for {referenceType} #{referenceId}",
@@ -140,7 +147,7 @@ public class WalletManager : IWalletManager
             {
                 WalletId = wallet.Id,
                 Amount = amount,
-                Type = "Release",
+                Type = TransactionType.HoldRelease,
                 ReferenceType = referenceType,
                 ReferenceId = referenceId,
                 Description = $"Funds released from {referenceType} #{referenceId}",
@@ -159,58 +166,7 @@ public class WalletManager : IWalletManager
         }
     }
 
-    public async Task TransferFundsAsync(int fromUserId, int toUserId, decimal amount, string description)
-    {
-        if (amount <= 0) throw new InvalidOperationException("Transfer amount must be positive");
-
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        var fromWallet = await _walletRepo.GetByUserIdWithLockAsync(fromUserId)
-            ?? throw new KeyNotFoundException("Sender wallet not found");
-        var toWallet = await _walletRepo.GetByUserIdWithLockAsync(toUserId)
-            ?? throw new KeyNotFoundException("Receiver wallet not found");
-
-        if (fromWallet.AvailableBalance < amount)
-            throw new InvalidOperationException("Insufficient available balance.");
-
-        fromWallet.Balance -= amount;
-        fromWallet.HeldBalance -= amount;
-        if (fromWallet.HeldBalance < 0) fromWallet.HeldBalance = 0;
-        fromWallet.UpdatedAt = DateTime.UtcNow;
-
-        toWallet.Balance += amount;
-        toWallet.UpdatedAt = DateTime.UtcNow;
-
-        var fromTxn = new WalletTransaction
-        {
-            WalletId = fromWallet.Id,
-            Amount = -amount,
-            Type = "Transfer",
-            ReferenceType = "Transfer",
-            Description = description,
-            BalanceSnapshot = fromWallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        };
-        var toTxn = new WalletTransaction
-        {
-            WalletId = toWallet.Id,
-            Amount = amount,
-            Type = "Transfer",
-            ReferenceType = "Transfer",
-            Description = description,
-            BalanceSnapshot = toWallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _walletRepo.AddTransactionAsync(fromTxn);
-        await _walletRepo.AddTransactionAsync(toTxn);
-
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
-
-        _logger.LogInformation("Transfer: From User {FromId} → To User {ToId}, Amount {Amount}",
-            fromUserId, toUserId, amount);
-    }
+    // N-06: Removed TransferFundsAsync — replaced by platform withdrawal flow
 
     public async Task DeductForOrderAsync(int userId, decimal amount, int orderId)
     {
@@ -234,7 +190,7 @@ public class WalletManager : IWalletManager
             {
                 WalletId = wallet.Id,
                 Amount = -amount,
-                Type = "Debit",
+                Type = TransactionType.OrderPayment,
                 ReferenceType = "Order",
                 ReferenceId = orderId,
                 Description = $"Payment for order #{orderId}",
@@ -257,6 +213,8 @@ public class WalletManager : IWalletManager
     {
         if (amount <= 0) throw new InvalidOperationException("Seller credit amount must be positive");
 
+        var sellerShare = amount * FinancialConstants.ProductSellerShare;
+
         var isOwner = _unitOfWork.CurrentTransaction == null;
         var tx = isOwner
             ? await _unitOfWork.BeginTransactionAsync()
@@ -266,17 +224,19 @@ public class WalletManager : IWalletManager
             var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
                 ?? await GetOrCreateWalletAsync(sellerId);
 
-            wallet.Balance += amount;
+            wallet.Balance += sellerShare;
+            wallet.HeldBalance += sellerShare;
+            wallet.FreezeUntil = DateTime.UtcNow.AddDays(FinancialConstants.ProductFreezeDays);
             wallet.UpdatedAt = DateTime.UtcNow;
 
             var txn = new WalletTransaction
             {
                 WalletId = wallet.Id,
-                Amount = amount,
-                Type = "Credit",
+                Amount = sellerShare,
+                Type = TransactionType.SellerCreditHeld,
                 ReferenceType = "Order",
                 ReferenceId = orderId,
-                Description = $"Payout for order #{orderId} (95%)",
+                Description = $"Payout for order #{orderId} ({FinancialConstants.ProductSellerShare:P0}) — frozen {FinancialConstants.ProductFreezeDays}d",
                 BalanceSnapshot = wallet.Balance,
                 CreatedAt = DateTime.UtcNow
             };
@@ -284,6 +244,9 @@ public class WalletManager : IWalletManager
 
             await _unitOfWork.SaveChangesAsync();
             if (isOwner) await tx.CommitAsync();
+
+            _logger.LogInformation("Seller credited: User {SellerId}, Gross {Amount}, Net {Net}, Order {OrderId}",
+                sellerId, amount, sellerShare, orderId);
         }
         catch
         {
@@ -292,7 +255,7 @@ public class WalletManager : IWalletManager
         }
     }
 
-    public async Task SettleAuctionPaymentAsync(int winnerId, int sellerId, decimal winningAmount, int auctionId)
+    public async Task SettleAuctionPaymentAsync(int winnerId, int sellerId, decimal winningAmount, int auctionId, int auctioneerId)
     {
         if (winningAmount <= 0)
             throw new InvalidOperationException("Winning amount must be positive");
@@ -304,20 +267,23 @@ public class WalletManager : IWalletManager
         var sellerWallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
             ?? throw new KeyNotFoundException("Seller wallet not found");
 
-        var platformFee = winningAmount * 0.05m;
-        var sellerAmount = winningAmount - platformFee;
+        // N-02: 3-way split from FinancialConstants
+        var sellerAmount = winningAmount * FinancialConstants.AuctionFishermanShare;
+        var auctioneerAmount = winningAmount * FinancialConstants.AuctionAuctioneerFee;
+        var platformAmount = winningAmount * FinancialConstants.AuctionPlatformFee;
+
+        // Deduct from winner
+        if (winnerWallet.AvailableBalance < winningAmount)
+            throw new InvalidOperationException("Winner has insufficient available balance to settle auction payment");
 
         winnerWallet.Balance -= winningAmount;
         winnerWallet.HeldBalance = Math.Max(0, winnerWallet.HeldBalance - winningAmount);
         winnerWallet.UpdatedAt = DateTime.UtcNow;
 
-        sellerWallet.Balance += sellerAmount;
-        sellerWallet.UpdatedAt = DateTime.UtcNow;
-
         winnerWallet.Transactions.Add(new WalletTransaction
         {
             Amount = -winningAmount,
-            Type = "AuctionPayment",
+            Type = TransactionType.AuctioneerFee,
             ReferenceType = "Auction",
             ReferenceId = auctionId,
             Description = $"Payment for winning auction #{auctionId}",
@@ -325,24 +291,67 @@ public class WalletManager : IWalletManager
             CreatedAt = DateTime.UtcNow
         });
 
+        // Credit seller (no freeze — auction delivery is in-person)
+        sellerWallet.Balance += sellerAmount;
+        sellerWallet.UpdatedAt = DateTime.UtcNow;
+
         sellerWallet.Transactions.Add(new WalletTransaction
         {
             Amount = sellerAmount,
-            Type = "AuctionPayout",
+            Type = TransactionType.SellerCredit,
             ReferenceType = "Auction",
             ReferenceId = auctionId,
-            Description = $"Payout for auction #{auctionId} (95%)",
+            Description = $"Payout for auction #{auctionId} ({FinancialConstants.AuctionFishermanShare:P0})",
             BalanceSnapshot = sellerWallet.Balance,
             CreatedAt = DateTime.UtcNow
         });
+
+        // Credit auctioneer
+        var auctioneerWallet = await _walletRepo.GetByUserIdWithLockAsync(auctioneerId);
+        if (auctioneerWallet != null)
+        {
+            auctioneerWallet.Balance += auctioneerAmount;
+            auctioneerWallet.UpdatedAt = DateTime.UtcNow;
+
+            auctioneerWallet.Transactions.Add(new WalletTransaction
+            {
+                Amount = auctioneerAmount,
+                Type = TransactionType.AuctioneerFee,
+                ReferenceType = "Auction",
+                ReferenceId = auctionId,
+                Description = $"Auctioneer fee for auction #{auctionId} ({FinancialConstants.AuctionAuctioneerFee:P0})",
+                BalanceSnapshot = auctioneerWallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        // Credit platform via SystemWallet
+        var systemWallet = await _systemWalletRepo.GetWithLockAsync();
+        if (systemWallet != null)
+        {
+            systemWallet.Balance += platformAmount;
+            systemWallet.UpdatedAt = DateTime.UtcNow;
+
+            await _systemWalletRepo.AddTransactionAsync(new SystemWalletTransaction
+            {
+                SystemWalletId = systemWallet.Id,
+                Amount = platformAmount,
+                Type = SystemTransactionType.AuctionFeeReceived,
+                ReferenceType = "Auction",
+                ReferenceId = auctionId,
+                Description = $"Platform fee for auction #{auctionId} ({FinancialConstants.AuctionPlatformFee:P0})",
+                BalanceSnapshot = systemWallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
 
         await _unitOfWork.SaveChangesAsync();
         await tx.CommitAsync();
 
         _logger.LogInformation(
             "Auction payment settled: Winner {WinnerId}, Seller {SellerId}, " +
-            "WinningAmount {Amount}, Fee {Fee}, Auction {AuctionId}",
-            winnerId, sellerId, winningAmount, platformFee, auctionId);
+            "Amount {Amount}, SellerShare {SellerShare}, AuctioneerShare {AuctioneerShare}, PlatformShare {PlatformShare}, Auction {AuctionId}",
+            winnerId, sellerId, winningAmount, sellerAmount, auctioneerAmount, platformAmount, auctionId);
     }
 
     public async Task CreditPlatformFeeAsync(int platformUserId, decimal amount, string referenceType, int referenceId)
@@ -356,6 +365,7 @@ public class WalletManager : IWalletManager
             : _unitOfWork.CurrentTransaction;
         try
         {
+            // Record on admin user wallet
             var wallet = await _walletRepo.GetByUserIdWithLockAsync(platformUserId)
                 ?? await GetOrCreateWalletAsync(platformUserId);
 
@@ -365,13 +375,33 @@ public class WalletManager : IWalletManager
             wallet.Transactions.Add(new WalletTransaction
             {
                 Amount = amount,
-                Type = "PlatformFee",
+                Type = TransactionType.PlatformFee,
                 ReferenceType = referenceType,
                 ReferenceId = referenceId,
-                Description = $"Platform fee for {referenceType} #{referenceId} (5%)",
+                Description = $"Platform fee for {referenceType} #{referenceId} ({FinancialConstants.ProductPlatformFee:P0})",
                 BalanceSnapshot = wallet.Balance,
                 CreatedAt = DateTime.UtcNow
             });
+
+            // Also credit SystemWallet
+            var systemWallet = await _systemWalletRepo.GetWithLockAsync();
+            if (systemWallet != null)
+            {
+                systemWallet.Balance += amount;
+                systemWallet.UpdatedAt = DateTime.UtcNow;
+
+                await _systemWalletRepo.AddTransactionAsync(new SystemWalletTransaction
+                {
+                    SystemWalletId = systemWallet.Id,
+                    Amount = amount,
+                    Type = SystemTransactionType.ProductFeeReceived,
+                    ReferenceType = referenceType,
+                    ReferenceId = referenceId,
+                    Description = $"Platform fee for {referenceType} #{referenceId}",
+                    BalanceSnapshot = systemWallet.Balance,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             await _unitOfWork.SaveChangesAsync();
             if (isOwner) await tx.CommitAsync();
@@ -402,7 +432,7 @@ public class WalletManager : IWalletManager
         wallet.Transactions.Add(new WalletTransaction
         {
             Amount = -amount,
-            Type = "SubscriptionPayment",
+            Type = TransactionType.SubscriptionPayment,
             ReferenceType = "Subscription",
             ReferenceId = subscriptionId,
             Description = $"Payment for subscription #{subscriptionId}",
@@ -418,6 +448,201 @@ public class WalletManager : IWalletManager
             userId, amount, subscriptionId);
     }
 
+    // N-01: Freeze payout into HeldBalance
+    public async Task ApplyPayoutFreezeAsync(int userId, decimal amount, int freezeDays)
+    {
+        if (amount <= 0) throw new InvalidOperationException("Freeze amount must be positive");
+        if (freezeDays <= 0) throw new InvalidOperationException("Freeze days must be positive");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
+            ?? throw new KeyNotFoundException("Wallet not found");
+
+        if (wallet.Balance < amount)
+            throw new InvalidOperationException("Insufficient balance to freeze");
+
+        wallet.HeldBalance += amount;
+        wallet.FreezeUntil = DateTime.UtcNow.AddDays(freezeDays);
+        wallet.UpdatedAt = DateTime.UtcNow;
+
+        var txn = new WalletTransaction
+        {
+            WalletId = wallet.Id,
+            Amount = -amount,
+            Type = TransactionType.HoldDeduction,
+            ReferenceType = "Freeze",
+            ReferenceId = null,
+            Description = $"Payout frozen for {freezeDays} days",
+            BalanceSnapshot = wallet.Balance,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _walletRepo.AddTransactionAsync(txn);
+
+        await _unitOfWork.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        _logger.LogInformation("Payout frozen: User {UserId}, Amount {Amount}, Days {Days}", userId, amount, freezeDays);
+    }
+
+    // N-05: Release expired freeze
+    public async Task ReleaseExpiredFreezeAsync(int walletId)
+    {
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(walletId);
+        if (wallet == null || wallet.HeldBalance <= 0 || wallet.FreezeUntil == null) return;
+
+        var amount = wallet.HeldBalance;
+        wallet.HeldBalance = 0;
+        wallet.FreezeUntil = null;
+        wallet.UpdatedAt = DateTime.UtcNow;
+
+        var txn = new WalletTransaction
+        {
+            WalletId = wallet.Id,
+            Amount = amount,
+            Type = TransactionType.HoldRelease,
+            ReferenceType = "Freeze",
+            ReferenceId = null,
+            Description = $"Frozen payout released after freeze period",
+            BalanceSnapshot = wallet.Balance,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _walletRepo.AddTransactionAsync(txn);
+
+        _logger.LogInformation("Freeze released: Wallet {WalletId}, Amount {Amount}", wallet.Id, amount);
+    }
+
+    // Return flow: reverse seller payout
+    public async Task ReverseSellerPayoutAsync(int sellerId, decimal amount, int orderId)
+    {
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
+        {
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
+                ?? throw new KeyNotFoundException("Seller wallet not found");
+
+            var sellerPayout = amount * FinancialConstants.ProductSellerShare;
+
+            // Reduce from held balance first, then balance (no negative)
+            var heldReduction = Math.Min(sellerPayout, wallet.HeldBalance);
+            wallet.HeldBalance -= heldReduction;
+            var balanceReduction = Math.Min(sellerPayout - heldReduction, wallet.Balance);
+            wallet.Balance -= balanceReduction;
+            if (wallet.HeldBalance < 0) wallet.HeldBalance = 0;
+            if (balanceReduction < sellerPayout - heldReduction)
+                _logger.LogWarning("Seller {SellerId} payout reversal shortfall: {Shortfall}",
+                    sellerId, sellerPayout - heldReduction - balanceReduction);
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            wallet.Transactions.Add(new WalletTransaction
+            {
+                Amount = -sellerPayout,
+                Type = TransactionType.OrderRefund,
+                ReferenceType = "Order",
+                ReferenceId = orderId,
+                Description = $"Return reversal for order #{orderId}",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    // Return flow: refund buyer
+    public async Task RefundBuyerAsync(int buyerId, decimal amount, int orderId)
+    {
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
+        {
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(buyerId)
+                ?? await GetOrCreateWalletAsync(buyerId);
+
+            wallet.Balance += amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            wallet.Transactions.Add(new WalletTransaction
+            {
+                Amount = amount,
+                Type = TransactionType.OrderRefund,
+                ReferenceType = "Order",
+                ReferenceId = orderId,
+                Description = $"Refund for returned order #{orderId}",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    // Return flow: reverse platform fee from SystemWallet
+    public async Task ReversePlatformFeeAsync(decimal amount, int orderId)
+    {
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction;
+        try
+        {
+            var systemWallet = await _systemWalletRepo.GetWithLockAsync();
+            if (systemWallet == null) return;
+
+            var feeAmount = amount * FinancialConstants.ProductPlatformFee;
+            var heldReduction = Math.Min(feeAmount, systemWallet.HeldBalance);
+            systemWallet.HeldBalance -= heldReduction;
+            var balanceReduction = Math.Min(feeAmount - heldReduction, systemWallet.Balance);
+            systemWallet.Balance -= balanceReduction;
+            systemWallet.HeldBalance = Math.Max(0, systemWallet.HeldBalance);
+            systemWallet.Balance = Math.Max(0, systemWallet.Balance);
+
+            if (balanceReduction < feeAmount - heldReduction)
+                _logger.LogWarning("SystemWallet shortfall on fee reversal for order {OrderId}: {Shortfall}",
+                    orderId, feeAmount - heldReduction - balanceReduction);
+            systemWallet.UpdatedAt = DateTime.UtcNow;
+
+            await _systemWalletRepo.AddTransactionAsync(new SystemWalletTransaction
+            {
+                SystemWalletId = systemWallet.Id,
+                Amount = -feeAmount,
+                Type = SystemTransactionType.ProductFeeRefunded,
+                ReferenceType = "Order",
+                ReferenceId = orderId,
+                Description = $"Platform fee refund for returned order #{orderId}",
+                BalanceSnapshot = systemWallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+
+            _logger.LogInformation("Platform fee reversed: Order {OrderId}, Amount {Amount}", orderId, feeAmount);
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<WalletTransactionsResponse> GetTransactionsAsync(int userId, PaginationRequest pagination)
     {
         var wallet = await _walletRepo.GetByUserIdAsync(userId)
@@ -428,7 +653,7 @@ public class WalletManager : IWalletManager
 
         return new WalletTransactionsResponse(
             items.Select(t => new WalletTransactionResponse(
-                t.Id, t.Amount, t.Type, t.ReferenceType, t.ReferenceId,
+                t.Id, t.Amount, t.Type.ToString(), t.ReferenceType, t.ReferenceId,
                 t.Description, t.BalanceSnapshot, t.CreatedAt)).ToList(),
             totalCount,
             pagination.Page,
@@ -443,15 +668,17 @@ public class WalletManager : IWalletManager
         return wallet.AvailableBalance >= amount;
     }
 
-        private async Task<Wallet> GetOrCreateWalletAsync(int userId)
+    private async Task<Wallet> GetOrCreateWalletAsync(int userId)
     {
-        var wallet = await _walletRepo.GetByUserIdAsync(userId);
+        await using var tx = await _unitOfWork.BeginTransactionAsync();
+        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId);
         if (wallet == null)
         {
             await CreateWalletAsync(userId);
-            wallet = await _walletRepo.GetByUserIdAsync(userId)
+            wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
                 ?? throw new KeyNotFoundException($"Failed to create wallet for user {userId}");
         }
+        await tx.CommitAsync();
         return wallet;
     }
 
@@ -477,5 +704,5 @@ public class WalletManager : IWalletManager
         await _walletRepo.CreateAsync(wallet);
     }
 
-    private static WalletResponse MapWallet(Wallet w) => new(w.Balance, w.HeldBalance, w.AvailableBalance, w.CreatedAt);
+    private static WalletResponse MapWallet(Wallet w) => new(w.Balance, w.HeldBalance, w.AvailableBalance, w.CreatedAt, w.FreezeUntil);
 }

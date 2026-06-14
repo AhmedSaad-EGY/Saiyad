@@ -5,7 +5,7 @@ public class WalletTransaction
     public int Id { get; set; }
     public int WalletId { get; set; }
     public decimal Amount { get; set; }
-    public string Type { get; set; } = null!;
+    public TransactionType Type { get; set; }
     public string ReferenceType { get; set; } = null!;
     public int? ReferenceId { get; set; }
     public string? Description { get; set; }

@@ -11,33 +11,28 @@ public class ReportsController : BaseController
         _reportManager = reportManager;
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize]
     [HttpPost]
-    public async Task<IActionResult> Create(CreateReportRequest request)
+    public async Task<IActionResult> SubmitReport(SubmitReportRequest request)
     {
         var userId = GetUserId();
-        var report = await _reportManager.CreateAsync(userId, request);
-        return CreatedAtAction(nameof(GetById), new { id = report.Id }, report);
+        var report = await _reportManager.SubmitReportAsync(userId, request);
+        return CreatedAtAction(nameof(GetAll), new { id = report.Id }, report);
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] ReportStatus? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var reports = await _reportManager.GetAllAsync();
+        var reports = await _reportManager.GetAllAsync(status, page, pageSize);
         return Ok(reports);
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(int id)
-    {
-        var report = await _reportManager.GetByIdAsync(id);
-        return Ok(report);
-    }
-
-    [Authorize(Roles = nameof(UserRole.Admin))]
-    [HttpPut("{id}/resolve")]
+    [HttpPatch("{id}/resolve")]
     public async Task<IActionResult> Resolve(int id, ResolveReportRequest request)
     {
         var report = await _reportManager.ResolveAsync(id, request);

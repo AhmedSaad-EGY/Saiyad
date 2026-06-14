@@ -45,10 +45,5 @@ namespace Sayiad.Data.Models;
                    .WithOne(w => w.Product)
                    .HasForeignKey(w => w.ProductId)
                    .OnDelete(DeleteBehavior.Cascade);
-
-            builder.HasMany(p => p.Reports)
-                   .WithOne(r => r.Product)
-                   .HasForeignKey(r => r.ProductId)
-                   .OnDelete(DeleteBehavior.Cascade);
         }
     }

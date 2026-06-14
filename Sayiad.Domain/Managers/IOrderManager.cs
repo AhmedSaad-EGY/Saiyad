@@ -11,6 +11,9 @@ public interface IOrderManager
     Task<PagedResult<OrderResponse>> GetUserOrdersAsync(int userId, PaginationRequest? pagination = null);
     Task<IEnumerable<OrderResponse>> GetSellerOrdersAsync(int sellerId);
     Task<OrderResponse> GetByIdAsync(int orderId, int userId);
-    Task<OrderResponse> UpdateStatusAsync(int orderId, CustomerOrderStatus status);
+    Task<OrderResponse> UpdateStatusAsync(int orderId, OrderStatus status, int? updatedByUserId = null);
     Task<OrderResponse> CancelAsync(int orderId, int userId);
+    Task<OrderResponse> RequestReturnAsync(int orderId, int userId);
+    Task<OrderResponse> ApproveReturnAsync(int orderId, int adminId);
+    Task<OrderResponse> RejectReturnAsync(int orderId, int adminId, string reason);
 }

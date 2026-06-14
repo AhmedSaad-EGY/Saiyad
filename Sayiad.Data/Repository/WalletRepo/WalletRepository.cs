@@ -25,10 +25,11 @@ public class WalletRepository : IWalletRepository
         return wallet;
     }
 
-    public Task<Wallet> UpdateAsync(Wallet wallet)
+    public async Task<Wallet> UpdateAsync(Wallet wallet)
     {
         _db.Set<Wallet>().Update(wallet);
-        return Task.FromResult(wallet);
+        await _db.SaveChangesAsync();
+        return wallet;
     }
 
     public Task AddTransactionAsync(WalletTransaction transaction)
@@ -58,5 +59,22 @@ public class WalletRepository : IWalletRepository
         return await _db.Set<Wallet>()
             .FromSqlInterpolated($"SELECT * FROM Wallets WITH (UPDLOCK, ROWLOCK) WHERE UserId = {userId}")
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<Wallet>> GetExpiredFrozenWalletsAsync()
+    {
+        return await _db.Wallets
+            .Where(w => w.FreezeUntil != null
+                     && w.FreezeUntil <= DateTime.UtcNow
+                     && w.HeldBalance > 0)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountExpiredFrozenWalletsAsync()
+    {
+        return await _db.Wallets
+            .CountAsync(w => w.FreezeUntil != null
+                          && w.FreezeUntil <= DateTime.UtcNow
+                          && w.HeldBalance > 0);
     }
 }

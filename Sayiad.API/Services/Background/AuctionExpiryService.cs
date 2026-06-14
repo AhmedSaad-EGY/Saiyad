@@ -87,7 +87,7 @@ public class AuctionExpiryService : BackgroundService
                     if (auction.WinnerUserId.HasValue && winningBid != null && auction.Product != null)
                     {
                         await walletManager.SettleAuctionPaymentAsync(
-                            winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id);
+                            winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id, auction.CreatedByUserId);
 
                         var auctioneer = await userRepo.GetByIdAsync(auction.CreatedByUserId);
                         if (auctioneer != null)

@@ -1,6 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using Sayiad.Domain.Common;
+using Sayiad.Domain.Constants;
 
 namespace Sayiad.Tests.Managers;
 
@@ -12,10 +15,15 @@ public class ForgotPasswordTests
     private readonly Mock<IAuditService> _auditServiceMock = new();
     private readonly Mock<ILogger<AuthManager>> _loggerMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
+    private readonly Mock<IOptions<AppSettings>> _settingsMock = new();
 
-    private AuthManager CreateManager() =>
-        new(_userRepoMock.Object, _tokenServiceMock.Object,
-            _emailServiceMock.Object, _walletManagerMock.Object, _auditServiceMock.Object, _loggerMock.Object);
+    private AuthManager CreateManager()
+    {
+        _settingsMock.Setup(s => s.Value).Returns(new AppSettings { FrontendUrl = "http://localhost:4200", AdminEmail = "admin@test.com" });
+        return new(_userRepoMock.Object, _tokenServiceMock.Object,
+            _emailServiceMock.Object, _walletManagerMock.Object, _auditServiceMock.Object,
+            _settingsMock.Object, _loggerMock.Object);
+    }
 
     [Fact]
     public async Task ForgotPassword_WithExistingEmail_SendsEmailAndReturnsSuccess()

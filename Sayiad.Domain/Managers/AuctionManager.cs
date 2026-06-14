@@ -99,7 +99,7 @@ public class AuctionManager : IAuctionManager
             EndTime = request.EndTime,
             StartingPrice = request.StartingPrice,
             ReservePrice = request.ReservePrice,
-            MinimumIncrement = request.MinimumIncrement,
+            BidIncrement = request.BidIncrement,
             CurrentHighestBid = request.StartingPrice,
             Status = isScheduled ? AuctionStatus.Scheduled : AuctionStatus.Active,
             CreatedAt = DateTime.UtcNow
@@ -168,9 +168,9 @@ public class AuctionManager : IAuctionManager
         if (auction.Status != AuctionStatus.Active)
             throw new InvalidOperationException("Auction is not active");
 
-        if (amount < auction.CurrentHighestBid + auction.MinimumIncrement)
+        if (amount < auction.CurrentHighestBid + auction.BidIncrement)
             throw new InvalidOperationException(
-                $"Bid must be at least {auction.CurrentHighestBid + auction.MinimumIncrement:C}");
+                $"Bid must be at least {auction.CurrentHighestBid + auction.BidIncrement:C}");
 
         if (auction.EndTime <= DateTime.UtcNow)
         {
@@ -261,7 +261,7 @@ public class AuctionManager : IAuctionManager
 
             var nextBid = Math.Min(
                 bestAutoBid.MaxBid,
-                auction.CurrentHighestBid + auction.MinimumIncrement);
+                auction.CurrentHighestBid + auction.BidIncrement);
 
             if (nextBid <= auction.CurrentHighestBid) break;
 
@@ -334,7 +334,7 @@ public class AuctionManager : IAuctionManager
         if (auction.WinnerUserId.HasValue && winningBid != null && auction.Product != null)
         {
             await _walletManager.SettleAuctionPaymentAsync(
-                winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id);
+                winningBid.UserId, auction.Product.SellerId, winningBid.Amount, auction.Id, auction.CreatedByUserId);
 
             var auctioneer = await _userRepo.GetByIdAsync(auction.CreatedByUserId);
             if (auctioneer != null)
@@ -508,7 +508,7 @@ public class AuctionManager : IAuctionManager
 
         var createRequest = new CreateAuctionRequest(
             product.Id, request.EndTime, request.StartingPrice,
-            request.ReservePrice, request.MinimumIncrement);
+            request.ReservePrice, request.BidIncrement);
 
         var auction = await CreateAsync(auctioneerId, createRequest);
 
@@ -576,6 +576,6 @@ public class AuctionManager : IAuctionManager
         auction.WinnerUserId, auction.Winner?.FullName,
         auction.StartTime, auction.EndTime,
         auction.StartingPrice, auction.ReservePrice,
-        auction.MinimumIncrement, auction.CurrentHighestBid,
+        auction.BidIncrement, auction.CurrentHighestBid,
         auction.Status, auction.Bids?.Count ?? 0, auction.CreatedAt);
 }

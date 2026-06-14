@@ -27,15 +27,15 @@ public class PaymentRepository : IPaymentRepository
             .ToListAsync();
     }
 
-    public async Task AddAsync(Payment payment)
+    public Task AddAsync(Payment payment)
     {
         _db.Payments.Add(payment);
-        await _db.SaveChangesAsync();
+        return Task.CompletedTask;
     }
 
-    public async Task UpdateAsync(Payment payment)
+    public Task UpdateAsync(Payment payment)
     {
         _db.Payments.Update(payment);
-        await _db.SaveChangesAsync();
+        return Task.CompletedTask;
     }
 }

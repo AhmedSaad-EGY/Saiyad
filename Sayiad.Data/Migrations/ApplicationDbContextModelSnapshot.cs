@@ -30,6 +30,13 @@ namespace Sayiad.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("BidIncrement")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ConfirmationDeadline")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -45,9 +52,8 @@ namespace Sayiad.Data.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal>("MinimumIncrement")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<bool>("IsProcessing")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
@@ -319,47 +325,6 @@ namespace Sayiad.Data.Migrations
                     b.ToTable("Categories");
                 });
 
-            modelBuilder.Entity("Sayiad.Data.Models.CustomerOrder", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BuyerId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int>("ShippingAddressId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Status")
-                        .HasMaxLength(20)
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("TotalPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BuyerId");
-
-                    b.HasIndex("ShippingAddressId");
-
-                    b.ToTable("CustomerOrders");
-                });
-
             modelBuilder.Entity("Sayiad.Data.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -390,6 +355,69 @@ namespace Sayiad.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AuctionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BuyerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OrderType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("ReturnRequested")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ReturnRequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ShippingAddressId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuyerId");
+
+                    b.HasIndex("ShippingAddressId");
+
+                    b.ToTable("CustomerOrders", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.OrderItem", b =>
@@ -463,6 +491,12 @@ namespace Sayiad.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.HasKey("Id");
 
@@ -589,30 +623,60 @@ namespace Sayiad.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
 
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Reason")
+                    b.Property<string>("Message")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("ReporterId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("TargetId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("ReporterId");
 
-                    b.ToTable("Reports");
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TargetType", "TargetId");
+
+                    b.ToTable("Reports", (string)null);
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Review", b =>
@@ -634,6 +698,9 @@ namespace Sayiad.Data.Migrations
 
                     b.Property<int>("Rating")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -829,6 +896,91 @@ namespace Sayiad.Data.Migrations
                     b.ToTable("SubscriptionPlans", (string)null);
                 });
 
+            modelBuilder.Entity("Sayiad.Data.Models.SystemWallet", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Balance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<decimal>("HeldBalance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemWallets", (string)null);
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.SystemWalletTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BalanceSnapshot")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsFrozen")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("SystemWalletId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("SystemWalletId");
+
+                    b.ToTable("SystemWalletTransactions", (string)null);
+                });
+
             modelBuilder.Entity("Sayiad.Data.Models.Transaction", b =>
                 {
                     b.Property<int>("Id")
@@ -967,6 +1119,9 @@ namespace Sayiad.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
+                    b.Property<DateTime?>("FreezeUntil")
+                        .HasColumnType("datetime2");
+
                     b.Property<decimal>("HeldBalance")
                         .HasColumnType("decimal(18,2)");
 
@@ -985,6 +1140,9 @@ namespace Sayiad.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FreezeUntil")
+                        .HasFilter("[FreezeUntil] IS NOT NULL");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -1025,8 +1183,8 @@ namespace Sayiad.Data.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(25)
+                        .HasColumnType("nvarchar(25)");
 
                     b.Property<int>("WalletId")
                         .HasColumnType("int");
@@ -1175,10 +1333,21 @@ namespace Sayiad.Data.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("Sayiad.Data.Models.CustomerOrder", b =>
+            modelBuilder.Entity("Sayiad.Data.Models.Notification", b =>
+                {
+                    b.HasOne("Sayiad.Data.Models.User", "User")
+                        .WithMany("Notifications")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.Order", b =>
                 {
                     b.HasOne("Sayiad.Data.Models.User", "Buyer")
-                        .WithMany("CustomerOrders")
+                        .WithMany("Orders")
                         .HasForeignKey("BuyerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1194,20 +1363,9 @@ namespace Sayiad.Data.Migrations
                     b.Navigation("ShippingAddress");
                 });
 
-            modelBuilder.Entity("Sayiad.Data.Models.Notification", b =>
-                {
-                    b.HasOne("Sayiad.Data.Models.User", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Sayiad.Data.Models.OrderItem", b =>
                 {
-                    b.HasOne("Sayiad.Data.Models.CustomerOrder", "Order")
+                    b.HasOne("Sayiad.Data.Models.Order", "Order")
                         .WithMany("OrderItems")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1234,7 +1392,7 @@ namespace Sayiad.Data.Migrations
 
             modelBuilder.Entity("Sayiad.Data.Models.Payment", b =>
                 {
-                    b.HasOne("Sayiad.Data.Models.CustomerOrder", "Order")
+                    b.HasOne("Sayiad.Data.Models.Order", "Order")
                         .WithMany("Payments")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1275,19 +1433,15 @@ namespace Sayiad.Data.Migrations
 
             modelBuilder.Entity("Sayiad.Data.Models.Report", b =>
                 {
-                    b.HasOne("Sayiad.Data.Models.Product", "Product")
-                        .WithMany("Reports")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Sayiad.Data.Models.User", "Reporter")
-                        .WithMany("Reports")
+                        .WithMany()
                         .HasForeignKey("ReporterId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Product");
+                    b.HasOne("Sayiad.Data.Models.User", null)
+                        .WithMany("Reports")
+                        .HasForeignKey("UserId");
 
                     b.Navigation("Reporter");
                 });
@@ -1342,6 +1496,17 @@ namespace Sayiad.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.SystemWalletTransaction", b =>
+                {
+                    b.HasOne("Sayiad.Data.Models.SystemWallet", "SystemWallet")
+                        .WithMany("Transactions")
+                        .HasForeignKey("SystemWalletId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SystemWallet");
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.Transaction", b =>
@@ -1411,7 +1576,7 @@ namespace Sayiad.Data.Migrations
                     b.Navigation("Products");
                 });
 
-            modelBuilder.Entity("Sayiad.Data.Models.CustomerOrder", b =>
+            modelBuilder.Entity("Sayiad.Data.Models.Order", b =>
                 {
                     b.Navigation("OrderItems");
 
@@ -1433,11 +1598,14 @@ namespace Sayiad.Data.Migrations
 
                     b.Navigation("OrderItems");
 
-                    b.Navigation("Reports");
-
                     b.Navigation("Reviews");
 
                     b.Navigation("Wishlists");
+                });
+
+            modelBuilder.Entity("Sayiad.Data.Models.SystemWallet", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("Sayiad.Data.Models.User", b =>
@@ -1446,9 +1614,9 @@ namespace Sayiad.Data.Migrations
 
                     b.Navigation("Cart");
 
-                    b.Navigation("CustomerOrders");
-
                     b.Navigation("Notifications");
+
+                    b.Navigation("Orders");
 
                     b.Navigation("Products");
 

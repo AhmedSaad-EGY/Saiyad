@@ -28,5 +28,4 @@ namespace Sayiad.Data.Models;
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
         public ICollection<Wishlist> Wishlists { get; set; } = new List<Wishlist>();
-        public ICollection<Report> Reports { get; set; } = new List<Report>();
     }

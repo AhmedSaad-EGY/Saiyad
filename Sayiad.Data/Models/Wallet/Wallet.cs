@@ -6,7 +6,8 @@ public class Wallet
     public int UserId { get; set; }
     public decimal Balance { get; set; }
     public decimal HeldBalance { get; set; }
-    public byte[] RowVersion { get; set; } = [];
+    public DateTime? FreezeUntil { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

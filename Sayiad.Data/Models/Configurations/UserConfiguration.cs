@@ -23,7 +23,7 @@ namespace Sayiad.Data.Models;
                    .HasForeignKey(p => p.SellerId)
                    .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasMany(u => u.CustomerOrders)
+            builder.HasMany(u => u.Orders)
                    .WithOne(o => o.Buyer)
                    .HasForeignKey(o => o.BuyerId)
                    .OnDelete(DeleteBehavior.Cascade);
@@ -61,7 +61,7 @@ namespace Sayiad.Data.Models;
             builder.HasMany(u => u.Reports)
                    .WithOne(r => r.Reporter)
                    .HasForeignKey(r => r.ReporterId)
-                   .OnDelete(DeleteBehavior.Cascade);
+                   .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(u => u.SellerProfile)
                    .WithOne(s => s.User)

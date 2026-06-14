@@ -7,7 +7,7 @@ namespace Sayiad.Data.Models;
             builder.HasKey(a => a.Id);
             builder.Property(a => a.StartingPrice).HasPrecision(18, 2);
             builder.Property(a => a.ReservePrice).HasPrecision(18, 2);
-            builder.Property(a => a.MinimumIncrement).HasPrecision(18, 2);
+            builder.Property(a => a.BidIncrement).HasPrecision(18, 2);
             builder.Property(a => a.CurrentHighestBid).HasPrecision(18, 2);
             builder.Property(a => a.Status).IsRequired().HasMaxLength(20);
             builder.Property(a => a.CreatedAt).HasDefaultValueSql("GETUTCDATE()");

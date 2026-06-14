@@ -124,7 +124,7 @@ public class AuctionConcurrencyTests : IDisposable
                 ProductId = 1, CreatedByUserId = user.Id,
                 StartTime = now, EndTime = now.AddDays(7),
                 StartingPrice = 100, ReservePrice = 100,
-                MinimumIncrement = 10, CurrentHighestBid = 100,
+                BidIncrement = 10, CurrentHighestBid = 100,
                 Status = AuctionStatus.Active, CreatedAt = now,
                 RowVersion = Array.Empty<byte>()
             });
@@ -167,7 +167,7 @@ public class AuctionConcurrencyTests : IDisposable
             StartTime = DateTime.UtcNow.AddDays(-1),
             EndTime = DateTime.UtcNow.AddDays(1),
             StartingPrice = 100m, ReservePrice = 100m,
-            MinimumIncrement = 10m, CurrentHighestBid = 100m,
+            BidIncrement = 10m, CurrentHighestBid = 100m,
             Status = AuctionStatus.Active, CreatedAt = DateTime.UtcNow,
             RowVersion = Array.Empty<byte>()
         };
@@ -185,8 +185,8 @@ public class AuctionConcurrencyTests : IDisposable
             throw new InvalidOperationException("Auction is not active");
         if (auction.EndTime <= DateTime.UtcNow)
             throw new InvalidOperationException("Auction has ended");
-        if (amount < auction.CurrentHighestBid + auction.MinimumIncrement)
-            throw new InvalidOperationException($"Bid must be at least {auction.CurrentHighestBid + auction.MinimumIncrement:C}");
+        if (amount < auction.CurrentHighestBid + auction.BidIncrement)
+            throw new InvalidOperationException($"Bid must be at least {auction.CurrentHighestBid + auction.BidIncrement:C}");
 
         foreach (var prevBid in auction.Bids.Where(b => b.BidStatus == BidStatus.Winning))
             prevBid.BidStatus = BidStatus.Valid;

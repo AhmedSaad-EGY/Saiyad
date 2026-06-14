@@ -8,7 +8,8 @@ namespace Sayiad.Data.Models;
         public PaymentStatus PaymentStatus { get; set; }
         public DateTime? PaidAt { get; set; }
         public DateTime CreatedAt { get; set; }
+        public byte[] RowVersion { get; set; } = null!;
 
-        public CustomerOrder Order { get; set; } = null!;
+        public Order Order { get; set; } = null!;
         public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
     }

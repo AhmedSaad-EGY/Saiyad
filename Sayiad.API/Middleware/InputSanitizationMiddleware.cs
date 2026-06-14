@@ -61,8 +61,6 @@ public class InputSanitizationMiddleware
         await _next(context);
     }
 
-    private static string SanitizeValue(string value)
-    {
-        return Regex.Replace(value, @"<[^>]*>", string.Empty);
-    }
+    private static string SanitizeValue(string? value)
+        => value is null ? string.Empty : Regex.Replace(value, @"<[^>]*>", string.Empty);
 }

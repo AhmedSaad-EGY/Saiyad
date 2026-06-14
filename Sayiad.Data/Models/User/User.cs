@@ -25,7 +25,7 @@ namespace Sayiad.Data.Models;
 
         // Relations
         public ICollection<Product> Products { get; set; } = new List<Product>();
-        public ICollection<CustomerOrder> CustomerOrders { get; set; } = new List<CustomerOrder>();
+        public ICollection<Order> Orders { get; set; } = new List<Order>();
         public ICollection<Bid> Bids { get; set; } = new List<Bid>();
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
         public ICollection<ShippingAddress> ShippingAddresses { get; set; } = new List<ShippingAddress>();

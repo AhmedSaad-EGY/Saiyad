@@ -139,6 +139,7 @@ try
     builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
     builder.Services.AddScoped<IWalletRepository, WalletRepository>();
     builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+    builder.Services.AddScoped<ISystemWalletRepository, SystemWalletRepository>();
 
     // ── Domain Managers ───────────────────────────────────────────────────────
     builder.Services.AddScoped<ICategoryManager, CategoryManager>();
@@ -169,6 +170,8 @@ try
     builder.Services.AddScoped<IAuditService, Sayiad.Api.Services.Audit.AuditService>();
 
     builder.Services.AddHostedService<AuctionExpiryService>();
+    builder.Services.AddHostedService<FreezeExpiryService>();
+    builder.Services.AddHostedService<ReturnExpiryService>();
 
     builder.Services.AddTransient<Sayiad.Api.Middleware.ExceptionMiddleware>();
 

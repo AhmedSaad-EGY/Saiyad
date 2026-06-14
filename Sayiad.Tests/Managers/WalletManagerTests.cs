@@ -1,8 +1,10 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Sayiad.Data.Data;
 using Sayiad.Data.Models;
+using Sayiad.Data.Repository.SystemWalletRepo;
 using Sayiad.Data.Repository.WalletRepo;
 using Sayiad.Domain.Dtos.WalletDtos;
 using Sayiad.Domain.Managers;
@@ -13,13 +15,22 @@ namespace Sayiad.Tests.Managers;
 public class WalletManagerTests
 {
     private readonly Mock<IWalletRepository> _walletRepoMock = new();
+    private readonly Mock<ISystemWalletRepository> _systemWalletRepoMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<ILogger<WalletManager>> _loggerMock = new();
+    private readonly Mock<IDbContextTransaction> _txMock = new();
 
     private const int UserId = 42;
     private const int SellerId = 7;
     private const int PlatformUserId = 1;
     private static readonly DateTime Now = DateTime.UtcNow;
+
+    public WalletManagerTests()
+    {
+        _txMock.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _txMock.Setup(t => t.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(_txMock.Object);
+    }
 
     private static Wallet CreateWallet(int userId, decimal balance = 500m, decimal held = 0m)
     {
@@ -36,7 +47,7 @@ public class WalletManagerTests
     }
 
     private WalletManager CreateManager() =>
-        new(_walletRepoMock.Object, _unitOfWorkMock.Object, _loggerMock.Object);
+        new(_walletRepoMock.Object, _systemWalletRepoMock.Object, _unitOfWorkMock.Object, _loggerMock.Object);
 
     // -------------------------------------------------------
     //  GetWalletAsync
@@ -46,7 +57,7 @@ public class WalletManagerTests
     public async Task GetWalletAsync_WhenWalletExists_ReturnsWalletResponse()
     {
         var wallet = CreateWallet(UserId, balance: 250m, held: 50m);
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(UserId)).ReturnsAsync(wallet);
 
         var result = await CreateManager().GetWalletAsync(UserId);
 
@@ -55,7 +66,7 @@ public class WalletManagerTests
         result.HeldBalance.Should().Be(50m);
         result.AvailableBalance.Should().Be(200m);
         result.CreatedAt.Should().Be(Now);
-        _walletRepoMock.Verify(r => r.GetByUserIdAsync(UserId), Times.Once);
+        _walletRepoMock.Verify(r => r.GetByUserIdWithLockAsync(UserId), Times.Once);
         _walletRepoMock.Verify(r => r.CreateAsync(It.IsAny<Wallet>()), Times.Never);
     }
 
@@ -63,12 +74,11 @@ public class WalletManagerTests
     public async Task GetWalletAsync_WhenWalletMissing_CreatesAndReturnsWalletResponse()
     {
         var createdWallet = CreateWallet(UserId, balance: 0m, held: 0m);
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(UserId))
-            .ReturnsAsync((Wallet?)null)   // GetOrCreateWalletAsync: not found
-            .ReturnsAsync((Wallet?)null)   // CreateWalletAsync: still null, proceed to create
-            .ReturnsAsync(createdWallet);  // GetOrCreateWalletAsync: post-creation fetch succeeds
-
-        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync(createdWallet);
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(UserId))
+            .ReturnsAsync((Wallet?)null)
+            .ReturnsAsync(createdWallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync((Wallet?)null);
+        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
 
         var result = await CreateManager().GetWalletAsync(UserId);
 
@@ -82,15 +92,10 @@ public class WalletManagerTests
     [Fact]
     public async Task GetWalletAsync_WhenCreationFails_ThrowsKeyNotFoundException()
     {
-        // Flow: GetOrCreateWalletAsync calls GetByUserIdAsync (needs null)
-        //   -> CreateWalletAsync calls GetByUserIdAsync (needs null)
-        //   -> GetOrCreateWalletAsync calls GetByUserIdAsync again (needs null)
-        // So we need 3 null returns to avoid Moq returning a null Task
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(UserId))
-            .ReturnsAsync((Wallet?)null)
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(UserId))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null);
-
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync((Wallet?)null);
         _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
 
         var act = () => CreateManager().GetWalletAsync(UserId);
@@ -110,15 +115,16 @@ public class WalletManagerTests
         const int orderId = 55;
         const decimal amount = 71.25m;
 
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(SellerId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(SellerId)).ReturnsAsync(wallet);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         await CreateManager().CreditSellerAsync(SellerId, amount, orderId);
 
-        wallet.Balance.Should().Be(100m + amount);
-        _walletRepoMock.Verify(r => r.UpdateAsync(wallet), Times.Once);
+        wallet.Balance.Should().Be(100m + amount * 0.95m);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _walletRepoMock.Verify(r => r.AddTransactionAsync(It.Is<WalletTransaction>(
-            t => t.Type == "Credit"
-              && t.Amount == amount
+            t => t.Type == TransactionType.SellerCreditHeld
+              && t.Amount == amount * 0.95m
               && t.ReferenceType == "Order"
               && t.ReferenceId == orderId
         )), Times.Once);
@@ -131,19 +137,20 @@ public class WalletManagerTests
         const int orderId = 56;
         const decimal amount = 100m;
 
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(SellerId))
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(It.IsAny<int>()))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync(wallet);
-
-        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(SellerId)).ReturnsAsync((Wallet?)null);
+        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         await CreateManager().CreditSellerAsync(SellerId, amount, orderId);
 
-        wallet.Balance.Should().Be(amount);
+        wallet.Balance.Should().Be(amount * 0.95m);
         _walletRepoMock.Verify(r => r.CreateAsync(It.Is<Wallet>(w => w.UserId == SellerId)), Times.Once);
-        _walletRepoMock.Verify(r => r.UpdateAsync(wallet), Times.Once);
-        _walletRepoMock.Verify(r => r.AddTransactionAsync(It.Is<WalletTransaction>(t => t.Type == "Credit")), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _walletRepoMock.Verify(r => r.AddTransactionAsync(It.Is<WalletTransaction>(t => t.Type == TransactionType.SellerCreditHeld)), Times.Once);
     }
 
     [Fact]
@@ -152,18 +159,18 @@ public class WalletManagerTests
         const int orderId = 57;
         const decimal amount = 50m;
 
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(SellerId))
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(It.IsAny<int>()))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null);
 
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(SellerId)).ReturnsAsync((Wallet?)null);
         _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
 
         var act = () => CreateManager().CreditSellerAsync(SellerId, amount, orderId);
 
         await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*Failed to create wallet for user 7*");
-        _walletRepoMock.Verify(r => r.UpdateAsync(It.IsAny<Wallet>()), Times.Never);
         _walletRepoMock.Verify(r => r.AddTransactionAsync(It.IsAny<WalletTransaction>()), Times.Never);
     }
 
@@ -179,14 +186,15 @@ public class WalletManagerTests
         const string refType = "Order";
         const int refId = 55;
 
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(PlatformUserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(PlatformUserId)).ReturnsAsync(wallet);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         await CreateManager().CreditPlatformFeeAsync(PlatformUserId, amount, refType, refId);
 
         wallet.Balance.Should().Be(10m + amount);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         wallet.Transactions.Should().ContainSingle(t =>
-            t.Type == "PlatformFee"
+            t.Type == TransactionType.PlatformFee
             && t.Amount == amount
             && t.ReferenceType == refType
             && t.ReferenceId == refId);
@@ -200,12 +208,14 @@ public class WalletManagerTests
         const string refType = "Auction";
         const int refId = 99;
 
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(PlatformUserId))
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(It.IsAny<int>()))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync(wallet);
 
-        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(PlatformUserId)).ReturnsAsync((Wallet?)null);
+        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         await CreateManager().CreditPlatformFeeAsync(PlatformUserId, amount, refType, refId);
 
@@ -219,11 +229,11 @@ public class WalletManagerTests
     {
         const decimal amount = 5m;
 
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(PlatformUserId))
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(It.IsAny<int>()))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync((Wallet?)null);
-
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(PlatformUserId)).ReturnsAsync((Wallet?)null);
         _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
 
         var act = () => CreateManager().CreditPlatformFeeAsync(PlatformUserId, amount, "Order", 1);
@@ -243,7 +253,7 @@ public class WalletManagerTests
             .WithMessage("Fee amount must be positive");
         await actNeg.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Fee amount must be positive");
-        _walletRepoMock.Verify(r => r.GetByUserIdAsync(It.IsAny<int>()), Times.Never);
+        _walletRepoMock.Verify(r => r.GetByUserIdWithLockAsync(It.IsAny<int>()), Times.Never);
     }
 
     // -------------------------------------------------------
@@ -255,12 +265,11 @@ public class WalletManagerTests
     {
         var newWallet = CreateWallet(UserId, balance: 0m);
 
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(UserId))
-            .ReturnsAsync((Wallet?)null)
+        _walletRepoMock.SetupSequence(r => r.GetByUserIdWithLockAsync(UserId))
             .ReturnsAsync((Wallet?)null)
             .ReturnsAsync(newWallet);
-
-        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync(newWallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync((Wallet?)null);
+        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
 
         var result = await CreateManager().GetWalletAsync(UserId);
 
@@ -277,7 +286,7 @@ public class WalletManagerTests
     public async Task GetWalletAsync_WithZeroBalanceWallet_ReturnsCorrectResponse()
     {
         var wallet = CreateWallet(UserId, balance: 0m, held: 0m);
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(UserId)).ReturnsAsync(wallet);
 
         var result = await CreateManager().GetWalletAsync(UserId);
 
@@ -290,7 +299,7 @@ public class WalletManagerTests
     public async Task GetWalletAsync_SequentialCalls_EachReturnsCorrectWallet()
     {
         var wallet = CreateWallet(UserId, balance: 100m);
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(UserId)).ReturnsAsync(wallet);
 
         var manager = CreateManager();
 
@@ -299,19 +308,13 @@ public class WalletManagerTests
 
         result1.Balance.Should().Be(100m);
         result2.Balance.Should().Be(100m);
-        _walletRepoMock.Verify(r => r.GetByUserIdAsync(UserId), Times.Exactly(2));
+        _walletRepoMock.Verify(r => r.GetByUserIdWithLockAsync(UserId), Times.Exactly(2));
         _walletRepoMock.Verify(r => r.CreateAsync(It.IsAny<Wallet>()), Times.Never);
     }
 
     [Fact]
     public async Task CreditSellerAsync_NegativeAmount_ThrowsInvalidOperationException()
     {
-        var wallet = CreateWallet(SellerId);
-        _walletRepoMock.SetupSequence(r => r.GetByUserIdAsync(SellerId))
-            .ReturnsAsync((Wallet?)null)
-            .ReturnsAsync(wallet);
-        _walletRepoMock.Setup(r => r.CreateAsync(It.IsAny<Wallet>())).ReturnsAsync((Wallet)null!);
-
         var act = () => CreateManager().CreditSellerAsync(SellerId, -50m, 1);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Seller credit amount must be positive");

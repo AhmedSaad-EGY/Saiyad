@@ -20,6 +20,7 @@ global using Sayiad.Data.Repository.SubscriptionRepo;
 global using Sayiad.Data.Repository.UserRepo;
 global using Sayiad.Data.Repository.WishlistRepo;
 global using Sayiad.Data.Repository.WalletRepo;
+global using Sayiad.Data.Repository.SystemWalletRepo;
 global using Sayiad.Domain.Dtos.AuctionDtos;
 global using Sayiad.Domain.Dtos.WalletDtos;
 global using Sayiad.Domain.Dtos.AuthDtos;

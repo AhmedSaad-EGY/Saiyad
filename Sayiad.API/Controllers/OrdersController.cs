@@ -67,7 +67,34 @@ public class OrdersController : BaseController
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusRequest request)
     {
-        var order = await _orderManager.UpdateStatusAsync(id, request.Status);
+        var adminId = GetUserId();
+        var order = await _orderManager.UpdateStatusAsync(id, request.Status, adminId);
+        return Ok(order);
+    }
+
+    [HttpPost("{id}/request-return")]
+    public async Task<IActionResult> RequestReturn(int id)
+    {
+        var userId = GetUserId();
+        var order = await _orderManager.RequestReturnAsync(id, userId);
+        return Ok(order);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPut("{id}/approve-return")]
+    public async Task<IActionResult> ApproveReturn(int id)
+    {
+        var adminId = GetUserId();
+        var order = await _orderManager.ApproveReturnAsync(id, adminId);
+        return Ok(order);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpPut("{id}/reject-return")]
+    public async Task<IActionResult> RejectReturn(int id, RejectReturnRequest request)
+    {
+        var adminId = GetUserId();
+        var order = await _orderManager.RejectReturnAsync(id, adminId, request.Reason);
         return Ok(order);
     }
 

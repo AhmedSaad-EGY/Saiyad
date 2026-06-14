@@ -21,7 +21,7 @@ public static class MappingConfig
                 src => src.Images.FirstOrDefault(i => i.IsPrimary)!.ImageUrl)
             .Map(dest => dest.Images, src => src.Images.Select(i => new ProductImageResponse(i.Id, i.ProductId, i.ImageUrl, i.IsPrimary)).ToList());
 
-        TypeAdapterConfig<CustomerOrder, OrderResponse>.NewConfig()
+        TypeAdapterConfig<Order, OrderResponse>.NewConfig()
             .Map(dest => dest.BuyerName, src => src.Buyer.FullName);
 
         TypeAdapterConfig<Review, ReviewResponse>.NewConfig()

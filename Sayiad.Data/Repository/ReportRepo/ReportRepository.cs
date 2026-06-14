@@ -1,5 +1,4 @@
 using Sayiad.Data.Data;
-using Sayiad.Data.Repository.ReportRepo;
 
 namespace Sayiad.Data.Repository.ReportRepo;
 
@@ -12,27 +11,44 @@ public class ReportRepository : IReportRepository
         _db = db;
     }
 
-    public async Task<IEnumerable<Report>> GetAllAsync()
-    {
-        return await _db.Reports
-            .Include(r => r.Reporter)
-            .Include(r => r.Product)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
-    }
-
     public async Task<Report?> GetByIdAsync(int reportId)
     {
         return await _db.Reports
             .Include(r => r.Reporter)
-            .Include(r => r.Product)
             .FirstOrDefaultAsync(r => r.Id == reportId);
     }
 
-    public async Task<bool> ExistsByReporterAndProductAsync(int reporterId, int productId)
+    public async Task<PagedResult<Report>> GetAllAsync(ReportStatus? status, int page, int pageSize)
+    {
+        var query = _db.Reports
+            .Include(r => r.Reporter)
+            .AsQueryable();
+
+        if (status.HasValue)
+            query = query.Where(r => r.Status == status.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<Report>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<bool> UserReportedTodayAsync(int userId)
     {
         return await _db.Reports
-            .AnyAsync(r => r.ReporterId == reporterId && r.ProductId == productId && r.Status == "Pending");
+            .AnyAsync(r => r.ReporterId == userId
+                        && r.CreatedAt.Date == DateTime.UtcNow.Date);
     }
 
     public async Task AddAsync(Report report)

@@ -1,6 +1,10 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using Sayiad.Data.Data;
+using Sayiad.Domain.Common;
 
 namespace Sayiad.Tests.Managers;
 
@@ -11,6 +15,9 @@ public class SubscriptionManagerTests
     private readonly Mock<ISubscriptionPlanRepository> _planRepoMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
     private readonly Mock<ILogger<SubscriptionManager>> _loggerMock = new();
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
+    private readonly Mock<IOptions<AppSettings>> _settingsMock = new();
+    private readonly Mock<IDbContextTransaction> _txMock = new();
 
     private static readonly SubscriptionPlan ProPlan = new()
     {
@@ -26,8 +33,14 @@ public class SubscriptionManagerTests
         Features = "[]", IsActive = true, SortOrder = 1
     };
 
-    private SubscriptionManager CreateManager() =>
-        new(_userRepoMock.Object, _subRepoMock.Object, _planRepoMock.Object, _walletManagerMock.Object, _loggerMock.Object);
+    private SubscriptionManager CreateManager()
+    {
+        _txMock.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(_txMock.Object);
+        _settingsMock.Setup(s => s.Value).Returns(new AppSettings { AdminEmail = "admin@test.com" });
+        return new(_userRepoMock.Object, _subRepoMock.Object, _planRepoMock.Object, _walletManagerMock.Object,
+            _unitOfWorkMock.Object, _settingsMock.Object, _loggerMock.Object);
+    }
 
     [Fact]
     public async Task UpgradeAsync_WithValidTier_CreatesSubscription()

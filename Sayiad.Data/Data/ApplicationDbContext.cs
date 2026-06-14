@@ -11,7 +11,7 @@
         public DbSet<ProductImage> ProductImages { get; set; } = null!;
         public DbSet<Auction> Auctions { get; set; } = null!;
         public DbSet<Bid> Bids { get; set; } = null!;
-        public DbSet<CustomerOrder> CustomerOrders { get; set; } = null!;
+        public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<Payment> Payments { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
@@ -27,6 +27,8 @@
         public DbSet<AuctionRequest> AuctionRequests { get; set; } = null!;
         public DbSet<Wallet> Wallets { get; set; } = null!;
         public DbSet<WalletTransaction> WalletTransactions { get; set; } = null!;
+        public DbSet<SystemWallet> SystemWallets { get; set; } = null!;
+        public DbSet<SystemWalletTransaction> SystemWalletTransactions { get; set; } = null!;
         public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
@@ -37,6 +39,9 @@
             modelBuilder.ApplyConfiguration(new WalletConfiguration());
             modelBuilder.ApplyConfiguration(new WalletTransactionConfiguration());
             modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
+            modelBuilder.ApplyConfiguration(new SystemWalletConfiguration());
+            modelBuilder.ApplyConfiguration(new SystemWalletTransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new ReportConfiguration());
 
             // Fix decimal precision warnings
             modelBuilder.Entity<Bid>(b =>
@@ -57,6 +62,7 @@
                     .HasConversion(
                         v => v == Models.PaymentStatus.Confirmed ? "Paid" : v.ToString(),
                         v => v == "Paid" ? Models.PaymentStatus.Confirmed : Enum.Parse<Models.PaymentStatus>(v));
+                p.Property(x => x.RowVersion).IsRowVersion();
             });
             modelBuilder.Entity<Subscription>(s =>
                 s.HasIndex(x => x.PaymentReference)

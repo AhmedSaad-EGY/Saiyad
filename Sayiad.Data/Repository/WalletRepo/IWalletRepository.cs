@@ -9,4 +9,6 @@ public interface IWalletRepository
     Task<List<WalletTransaction>> GetTransactionsAsync(int walletId, PaginationRequest pagination);
     Task<int> GetTransactionCountAsync(int walletId);
     Task<Wallet?> GetByUserIdWithLockAsync(int userId);
+    Task<List<Wallet>> GetExpiredFrozenWalletsAsync();
+    Task<int> CountExpiredFrozenWalletsAsync();
 }

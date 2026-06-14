@@ -4,13 +4,14 @@ namespace Sayiad.Data.Repository.OrderRepo;
 
 public interface IOrderRepository
 {
-    Task<PagedResult<CustomerOrder>> GetAllOrdersAsync(PaginationRequest pagination);
-    Task<PagedResult<CustomerOrder>> GetUserOrdersAsync(int userId, PaginationRequest pagination);
-    Task<IEnumerable<CustomerOrder>> GetSellerOrdersAsync(int sellerId);
-    Task<CustomerOrder?> GetByIdAsync(int orderId, int userId);
-    Task<CustomerOrder?> GetByIdForAdminAsync(int orderId);
-    Task AddAsync(CustomerOrder order);
-    Task UpdateAsync(CustomerOrder order);
+    Task<PagedResult<Order>> GetAllOrdersAsync(PaginationRequest pagination);
+    Task<PagedResult<Order>> GetUserOrdersAsync(int userId, PaginationRequest pagination);
+    Task<IEnumerable<Order>> GetSellerOrdersAsync(int sellerId);
+    Task<Order?> GetByIdAsync(int orderId, int userId);
+    Task<Order?> GetByIdForAdminAsync(int orderId);
+    Task AddAsync(Order order);
+    Task UpdateAsync(Order order);
     Task<ShippingAddress?> GetShippingAddressAsync(int addressId, int userId);
-    Task<CustomerOrder> CreateOrderTransactionAsync(CustomerOrder order, int userId);
+    Task<Order> CreateOrderTransactionAsync(Order order, int userId);
+    Task<List<Order>> GetPendingReturnRequestsAsync(DateTime cutoff);
 }

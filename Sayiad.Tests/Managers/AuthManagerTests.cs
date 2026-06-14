@@ -1,6 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using Sayiad.Domain.Common;
+using Sayiad.Domain.Constants;
 
 namespace Sayiad.Tests.Managers;
 
@@ -12,21 +15,26 @@ public class AuthManagerTests
     private readonly Mock<IAuditService> _auditServiceMock = new();
     private readonly Mock<ILogger<AuthManager>> _loggerMock = new();
     private readonly Mock<IWalletManager> _walletManagerMock = new();
-    private AuthManager CreateManager() =>
-        new(_userRepoMock.Object, _tokenServiceMock.Object,
-            _emailServiceMock.Object, _walletManagerMock.Object, _auditServiceMock.Object, _loggerMock.Object);
+    private readonly Mock<IOptions<AppSettings>> _settingsMock = new();
+    private AuthManager CreateManager()
+    {
+        _settingsMock.Setup(s => s.Value).Returns(new AppSettings { FrontendUrl = "http://localhost:4200", AdminEmail = "admin@test.com" });
+        return new(_userRepoMock.Object, _tokenServiceMock.Object,
+            _emailServiceMock.Object, _walletManagerMock.Object, _auditServiceMock.Object,
+            _settingsMock.Object, _loggerMock.Object);
+    }
 
     [Fact]
     public async Task Register_WithAdminRole_ThrowsUnauthorizedAccessException()
     {
         var manager = CreateManager();
         var request = new RegisterRequest(
-            "Test", "test@test.com", "Pass123!", "0123456789", "Admin");
+            "Test", "test@test.com", "Pass123!", "0123456789", Role: "Admin");
 
         var act = () => manager.RegisterAsync(request);
 
-        await act.Should().ThrowAsync<UnauthorizedAccessException>()
-            .WithMessage("*Admin*");
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*not valid for registration*");
     }
 
     [Fact]

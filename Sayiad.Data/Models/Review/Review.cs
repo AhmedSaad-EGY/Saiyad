@@ -7,6 +7,7 @@ namespace Sayiad.Data.Models;
         public int Rating { get; set; }
         public string? Comment { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         public Product Product { get; set; } = null!;
         public User User { get; set; } = null!;

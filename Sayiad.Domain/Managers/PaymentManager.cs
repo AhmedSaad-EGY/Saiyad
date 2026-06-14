@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sayiad.Data.Data;
 using Sayiad.Domain.Common;
+using Sayiad.Domain.Constants;
 using Sayiad.Domain.Dtos.PaymentDtos;
 
 namespace Sayiad.Domain.Managers;
@@ -15,6 +17,7 @@ public class PaymentManager : IPaymentManager
     private readonly IWalletManager _walletManager;
     private readonly IUserRepository _userRepo;
     private readonly IOptions<AppSettings> _settings;
+    private readonly IAuctionRepository _auctionRepo;
 
     public PaymentManager(
         IPaymentRepository paymentRepo,
@@ -23,7 +26,8 @@ public class PaymentManager : IPaymentManager
         ILogger<PaymentManager> logger,
         IWalletManager walletManager,
         IUserRepository userRepo,
-        IOptions<AppSettings> settings)
+        IOptions<AppSettings> settings,
+        IAuctionRepository auctionRepo)
     {
         _paymentRepo = paymentRepo;
         _orderRepo = orderRepo;
@@ -32,6 +36,7 @@ public class PaymentManager : IPaymentManager
         _walletManager = walletManager;
         _userRepo = userRepo;
         _settings = settings;
+        _auctionRepo = auctionRepo;
     }
 
     public async Task<PaymentResponse> InitiateAsync(int userId, InitiatePaymentRequest request)
@@ -42,7 +47,7 @@ public class PaymentManager : IPaymentManager
         if (order.BuyerId != userId)
             throw new UnauthorizedAccessException("You can only pay for your own orders");
 
-        if (order.Status != CustomerOrderStatus.Pending)
+        if (order.Status != OrderStatus.Pending)
             throw new InvalidOperationException("Cannot initiate payment: order is not in Pending status.");
 
         await using var tx = await _unitOfWork.BeginTransactionAsync();
@@ -98,41 +103,53 @@ public class PaymentManager : IPaymentManager
         };
 
         payment.Transactions.Add(transaction);
-        payment.Order.Status = CustomerOrderStatus.Paid;
+        payment.Order.Status = OrderStatus.Paid;
         payment.Order.UpdatedAt = DateTime.UtcNow;
 
-        // Wallet settlement INSIDE transaction: deduct full amount from buyer, credit each seller 95%, admin gets 5%
-        var order = await _orderRepo.GetByIdAsync(payment.OrderId, userId);
-        if (order != null)
+        if (payment.Order.OrderType == OrderType.Auction && payment.Order.AuctionId.HasValue)
         {
-            await _walletManager.DeductForOrderAsync(order.BuyerId, order.TotalPrice, order.Id);
+            // Auction flow: use SettleAuctionPaymentAsync with 3-way split
+            var auctionSellerId = payment.Order.OrderItems.FirstOrDefault()?.SellerId;
+            if (auctionSellerId.HasValue && payment.Order.AuctionId.HasValue)
+            {
+                var auction = await _auctionRepo.GetByIdAsync(payment.Order.AuctionId.Value);
+                var auctioneerId = auction?.CreatedByUserId ?? 0;
+
+                await _walletManager.SettleAuctionPaymentAsync(
+                    payment.Order.BuyerId, auctionSellerId.Value, payment.Order.TotalPrice, payment.Order.AuctionId.Value, auctioneerId);
+            }
+        }
+        else
+        {
+            // Standard product flow
+            await _walletManager.DeductForOrderAsync(payment.Order.BuyerId, payment.Order.TotalPrice, payment.Order.Id);
 
             var admin = await _userRepo.GetByEmailAsync(_settings.Value.AdminEmail);
             var adminId = admin?.Id;
 
-            var sellerGroups = order.OrderItems.GroupBy(i => i.SellerId);
+            var sellerGroups = payment.Order.OrderItems.GroupBy(i => i.SellerId);
             foreach (var sellerGroup in sellerGroups)
             {
                 var sellerTotal = sellerGroup.Sum(i => i.Subtotal > 0 ? i.Subtotal : i.UnitPrice * i.Quantity);
-                var fee = sellerTotal * 0.05m;
-                var sellerAmount = sellerTotal - fee;
+                var fee = sellerTotal * FinancialConstants.ProductPlatformFee;
 
-                await _walletManager.CreditSellerAsync(sellerGroup.Key, sellerAmount, order.Id);
+                // Pass FULL sellerTotal — CreditSellerAsync calculates 95% internally
+                await _walletManager.CreditSellerAsync(sellerGroup.Key, sellerTotal, payment.Order.Id);
                 if (adminId.HasValue)
-                    await _walletManager.CreditPlatformFeeAsync(adminId.Value, fee, "Order", order.Id);
-
-                // Release the 5% product listing hold on each sold item (one hold per product)
-                foreach (var productGroup in sellerGroup.GroupBy(i => i.ProductId))
-                {
-                    var first = productGroup.First();
-                    var holdAmount = first.UnitPrice * 0.05m;
-                    await _walletManager.ReleaseHeldFundsAsync(first.SellerId, holdAmount, "Product", productGroup.Key);
-                }
+                    await _walletManager.CreditPlatformFeeAsync(adminId.Value, fee, "Order", payment.Order.Id);
             }
         }
 
-        await _paymentRepo.UpdateAsync(payment);
-        await _unitOfWork.SaveChangesAsync();
+        try
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new InvalidOperationException(
+                "Payment was already confirmed by another request. Duplicate confirmation prevented.");
+        }
+
         await tx.CommitAsync();
 
         _logger.LogInformation("Payment confirmed: {PaymentId}", paymentId);

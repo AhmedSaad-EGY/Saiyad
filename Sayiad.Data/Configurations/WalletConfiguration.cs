@@ -18,6 +18,7 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(w => w.UserId).IsUnique();
+        builder.HasIndex(w => w.FreezeUntil).HasFilter("[FreezeUntil] IS NOT NULL");
     }
 }
 
@@ -28,7 +29,10 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
         builder.ToTable("WalletTransactions");
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Amount).HasColumnType("decimal(18,2)");
-        builder.Property(t => t.Type).HasMaxLength(50).IsRequired();
+        builder.Property(t => t.Type)
+            .HasMaxLength(25)
+            .IsRequired()
+            .HasConversion<string>();
         builder.Property(t => t.ReferenceType).HasMaxLength(50).IsRequired();
         builder.Property(t => t.Description).HasMaxLength(500);
         builder.Property(t => t.BalanceSnapshot).HasColumnType("decimal(18,2)");
