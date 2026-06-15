@@ -651,5 +651,8 @@ public class AuctionManager : IAuctionManager
         auction.StartTime, auction.EndTime,
         auction.StartingPrice, auction.ReservePrice,
         auction.BidIncrement, auction.CurrentHighestBid,
-        auction.Status, auction.Bids?.Count ?? 0, auction.CreatedAt);
+        auction.Status, auction.Bids?.Count ?? 0, auction.CreatedAt,
+        auction.Product?.SellerId, auction.Product?.Seller?.FullName,
+        auction.CreatedByUserId, auction.CreatedByUser?.FullName,
+        auction.ConfirmationDeadline);
 }

@@ -14,7 +14,9 @@ public class AuctionRepository : IAuctionRepository
     {
         var query = _db.Auctions
             .Include(a => a.Product!).ThenInclude(p => p.Images)
+            .Include(a => a.Product!).ThenInclude(p => p.Seller)
             .Include(a => a.Bids)
+            .Include(a => a.CreatedByUser)
             .Where(a => a.Product != null);
 
         if (string.IsNullOrWhiteSpace(filter.Status))
@@ -67,8 +69,10 @@ public class AuctionRepository : IAuctionRepository
     {
         return await _db.Auctions
             .Include(a => a.Product!).ThenInclude(p => p.Images)
+            .Include(a => a.Product!).ThenInclude(p => p.Seller)
             .Include(a => a.Bids).ThenInclude(b => b.User)
             .Include(a => a.Winner)
+            .Include(a => a.CreatedByUser)
             .FirstOrDefaultAsync(a => a.Id == auctionId);
     }
 

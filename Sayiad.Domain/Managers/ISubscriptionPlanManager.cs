@@ -5,6 +5,7 @@ namespace Sayiad.Domain.Managers;
 public interface ISubscriptionPlanManager
 {
     Task<List<SubscriptionPlanResponse>> GetActivePlansAsync();
+    Task<List<SubscriptionPlanResponse>> GetAllPlansAsync();
     Task<SubscriptionPlanResponse> GetByIdAsync(int id);
     Task<SubscriptionPlanResponse> CreateAsync(CreateSubscriptionPlanRequest request);
     Task<SubscriptionPlanResponse> UpdateAsync(int id, UpdateSubscriptionPlanRequest request);

@@ -7,6 +7,7 @@ namespace Sayiad.Domain.Managers;
 public interface IProductManager
 {
     Task<PagedResult<ProductResponse>> GetAllAsync(ProductFilterRequest? filter = null, PaginationRequest? pagination = null);
+    Task<PagedResult<ProductResponse>> GetAllForAdminAsync(PaginationRequest? pagination = null);
     Task<ProductResponse> GetByIdAsync(int id);
     Task<ProductResponse> CreateAsync(int sellerId, CreateProductRequest request);
     Task<ProductResponse> UpdateAsync(int id, int sellerId, UpdateProductRequest request);

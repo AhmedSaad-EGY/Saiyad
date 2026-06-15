@@ -19,6 +19,13 @@ public class SubscriptionPlanRepository : ISubscriptionPlanRepository
             .ToListAsync();
     }
 
+    public async Task<List<SubscriptionPlan>> GetAllPlansAsync()
+    {
+        return await _db.Set<SubscriptionPlan>()
+            .OrderBy(p => p.SortOrder)
+            .ToListAsync();
+    }
+
     public async Task<SubscriptionPlan?> GetByIdAsync(int id)
     {
         return await _db.Set<SubscriptionPlan>().FindAsync(id);

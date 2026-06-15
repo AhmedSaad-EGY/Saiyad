@@ -3,7 +3,7 @@ namespace Sayiad.Api.Controllers;
 
 [ApiController]
     [Route("api/[controller]")]
-[Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+[Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
 public class OrdersController : BaseController
 {
     private readonly IOrderManager _orderManager;

@@ -19,6 +19,14 @@ public class SubscriptionPlansController : ControllerBase
         return Ok(plans);
     }
 
+    [HttpGet("admin")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<IActionResult> GetAllForAdmin()
+    {
+        var plans = await _planManager.GetAllPlansAsync();
+        return Ok(plans);
+    }
+
     [HttpGet("{id}")]
     [AllowAnonymous]
     public async Task<IActionResult> GetById(int id)

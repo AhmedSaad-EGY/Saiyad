@@ -19,6 +19,14 @@ public class ProductsController : BaseController
         return Ok(products);
     }
 
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [HttpGet("admin")]
+    public async Task<IActionResult> GetAllForAdmin([FromQuery] PaginationRequest? pagination)
+    {
+        var products = await _productManager.GetAllForAdminAsync(pagination);
+        return Ok(products);
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {

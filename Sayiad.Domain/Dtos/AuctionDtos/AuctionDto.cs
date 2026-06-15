@@ -2,7 +2,27 @@
 namespace Sayiad.Domain.Dtos.AuctionDtos;
 
 /// <summary>Full auction details returned to clients.</summary>
-public record AuctionResponse(int Id, int ProductId, string ProductTitle, string? ProductImageUrl, int? WinnerUserId, string? WinnerName, DateTime StartTime, DateTime EndTime, decimal StartingPrice, decimal ReservePrice, decimal BidIncrement, decimal CurrentHighestBid, AuctionStatus Status, int BidCount, DateTime CreatedAt);
+public record AuctionResponse(
+    int Id,
+    int ProductId,
+    string ProductTitle,
+    string? ProductImageUrl,
+    int? WinnerUserId,
+    string? WinnerName,
+    DateTime StartTime,
+    DateTime EndTime,
+    decimal StartingPrice,
+    decimal ReservePrice,
+    decimal BidIncrement,
+    decimal CurrentHighestBid,
+    AuctionStatus Status,
+    int BidCount,
+    DateTime CreatedAt,
+    int? SellerId = null,
+    string? SellerName = null,
+    int? AuctioneerId = null,
+    string? AuctioneerName = null,
+    DateTime? ConfirmationDeadline = null);
 
 /// <summary>Request to create a new auction for a product. StartTime is optional — null means start immediately.</summary>
 public record CreateAuctionRequest(

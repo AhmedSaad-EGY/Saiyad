@@ -41,6 +41,19 @@ public class ProductManager : IProductManager
         };
     }
 
+    public async Task<PagedResult<ProductResponse>> GetAllForAdminAsync(PaginationRequest? pagination = null)
+    {
+        var p = pagination ?? new PaginationRequest();
+        var result = await _repo.GetAllForAdminAsync(p);
+        return new PagedResult<ProductResponse>
+        {
+            Items = result.Items.Select(MapToResponse).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        };
+    }
+
     public async Task<ProductResponse> GetByIdAsync(int id)
     {
         var product = await _repo.GetByIdAsync(id)

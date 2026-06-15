@@ -41,4 +41,22 @@ public class AdminController : BaseController
             pendingReportCount = pendingReports.TotalCount
         });
     }
+
+    [HttpGet("system-wallet/transactions")]
+    public async Task<IActionResult> GetSystemWalletTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    {
+        var transactions = await _systemWalletRepo.GetTransactionsAsync(page, pageSize);
+        return Ok(transactions.Select(t => new
+        {
+            t.Id,
+            t.Amount,
+            Type = t.Type.ToString(),
+            t.ReferenceType,
+            t.ReferenceId,
+            t.Description,
+            t.BalanceSnapshot,
+            t.IsFrozen,
+            t.CreatedAt
+        }));
+    }
 }

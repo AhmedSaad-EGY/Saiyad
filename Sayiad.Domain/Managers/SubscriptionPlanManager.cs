@@ -20,6 +20,12 @@ public class SubscriptionPlanManager : ISubscriptionPlanManager
         return plans.Select(MapToResponse).ToList();
     }
 
+    public async Task<List<SubscriptionPlanResponse>> GetAllPlansAsync()
+    {
+        var plans = await _planRepo.GetAllPlansAsync();
+        return plans.Select(MapToResponse).ToList();
+    }
+
     public async Task<SubscriptionPlanResponse> GetByIdAsync(int id)
     {
         var plan = await _planRepo.GetByIdAsync(id)

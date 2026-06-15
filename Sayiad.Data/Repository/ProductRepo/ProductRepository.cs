@@ -18,6 +18,7 @@ public class ProductRepository : IProductRepository
     {
         var query = _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Seller)
             .Include(p => p.Images)
             .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available)
             .AsQueryable();
@@ -75,10 +76,36 @@ public class ProductRepository : IProductRepository
         };
     }
 
+    public async Task<PagedResult<Product>> GetAllForAdminAsync(PaginationRequest pagination)
+    {
+        var query = _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.Seller)
+            .Include(p => p.Images)
+            .Where(p => p.DeletedAt == null);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<Product>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = pagination.Page,
+            PageSize = pagination.PageSize
+        };
+    }
+
     public async Task<Product?> GetByIdAsync(int id)
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Seller)
             .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null);
     }
@@ -87,6 +114,7 @@ public class ProductRepository : IProductRepository
     {
         return await _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Seller)
             .Include(p => p.Images)
             .Where(p => p.SellerId == sellerId && p.DeletedAt == null)
             .OrderByDescending(p => p.CreatedAt)
@@ -97,6 +125,7 @@ public class ProductRepository : IProductRepository
     {
         var query = _db.Products
             .Include(p => p.Category)
+            .Include(p => p.Seller)
             .Include(p => p.Images)
             .Where(p => p.SellerId == sellerId && p.DeletedAt == null);
 
@@ -166,6 +195,7 @@ public class ProductRepository : IProductRepository
         var query = _db.Products
             .Include(p => p.Category)
             .Include(p => p.Seller)
+            .Include(p => p.Images)
             .Where(p => p.DeletedAt == null && p.Status == ProductStatus.PendingReview)
             .OrderBy(p => p.CreatedAt);
 

@@ -5,6 +5,7 @@ namespace Sayiad.Data.Repository.ProductRepo;
 public interface IProductRepository
 {
     Task<PagedResult<Product>> GetAllAsync(ProductFilterRequest filter, PaginationRequest pagination);
+    Task<PagedResult<Product>> GetAllForAdminAsync(PaginationRequest pagination);
     Task<Product?> GetByIdAsync(int id);
     Task<IEnumerable<Product>> GetSellerProductsAsync(int sellerId);
     Task<PagedResult<Product>> GetSellerProductsPagedAsync(int sellerId, PaginationRequest pagination);
