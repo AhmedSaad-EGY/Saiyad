@@ -9,6 +9,7 @@ namespace Sayiad.Data.Models;
         public DateTime? PaidAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public byte[] RowVersion { get; set; } = null!;
+        public DateTime? FreezeUntil { get; set; }
 
         public Order Order { get; set; } = null!;
         public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();

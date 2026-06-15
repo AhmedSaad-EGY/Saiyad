@@ -1,4 +1,4 @@
-namespace Sayiad.Data.Models;
+namespace Sayiad.Data.Configurations;
 
 public class AuctionRequestConfiguration : IEntityTypeConfiguration<AuctionRequest>
 {

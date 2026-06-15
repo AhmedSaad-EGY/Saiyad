@@ -35,15 +35,8 @@
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
-            modelBuilder.ApplyConfiguration(new AuctionRequestConfiguration());
-            modelBuilder.ApplyConfiguration(new WalletConfiguration());
-            modelBuilder.ApplyConfiguration(new WalletTransactionConfiguration());
-            modelBuilder.ApplyConfiguration(new SubscriptionPlanConfiguration());
-            modelBuilder.ApplyConfiguration(new SystemWalletConfiguration());
-            modelBuilder.ApplyConfiguration(new SystemWalletTransactionConfiguration());
-            modelBuilder.ApplyConfiguration(new ReportConfiguration());
 
-            // Fix decimal precision warnings
+            // Fix decimal precision warnings for entities without dedicated configuration files
             modelBuilder.Entity<Bid>(b =>
             {
                 b.Property(x => x.Amount).HasPrecision(18, 2);
@@ -53,16 +46,6 @@
             {
                 o.Property(x => x.UnitPrice).HasPrecision(18, 2);
                 o.Property(x => x.Subtotal).HasPrecision(18, 2);
-            });
-            modelBuilder.Entity<Payment>(p =>
-            {
-                p.Property(x => x.Amount).HasPrecision(18, 2);
-                p.Property(x => x.PaymentStatus)
-                    .HasMaxLength(20)
-                    .HasConversion(
-                        v => v == Models.PaymentStatus.Confirmed ? "Paid" : v.ToString(),
-                        v => v == "Paid" ? Models.PaymentStatus.Confirmed : Enum.Parse<Models.PaymentStatus>(v));
-                p.Property(x => x.RowVersion).IsRowVersion();
             });
             modelBuilder.Entity<Subscription>(s =>
                 s.HasIndex(x => x.PaymentReference)

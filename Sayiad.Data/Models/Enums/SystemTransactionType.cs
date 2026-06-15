@@ -2,9 +2,10 @@ namespace Sayiad.Data.Models;
 
 public enum SystemTransactionType
 {
-    ProductFeeReceived,
-    ProductFeeRefunded,
-    AuctionFeeReceived,
-    SubscriptionReceived,
-    AdminWithdrawal
+    Deposit,
+    PlatformFeeCredit,
+    PlatformFeeRefunded,
+    AuctioneerFeeCredit,
+    SubscriptionRevenueCredit,
+    AuctioneerFeeWithdrawal
 }

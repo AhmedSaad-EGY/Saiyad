@@ -336,7 +336,7 @@ public class WalletManager : IWalletManager
             {
                 SystemWalletId = systemWallet.Id,
                 Amount = platformAmount,
-                Type = SystemTransactionType.AuctionFeeReceived,
+                Type = SystemTransactionType.AuctioneerFeeCredit,
                 ReferenceType = "Auction",
                 ReferenceId = auctionId,
                 Description = $"Platform fee for auction #{auctionId} ({FinancialConstants.AuctionPlatformFee:P0})",
@@ -394,7 +394,7 @@ public class WalletManager : IWalletManager
                 {
                     SystemWalletId = systemWallet.Id,
                     Amount = amount,
-                    Type = SystemTransactionType.ProductFeeReceived,
+                    Type = SystemTransactionType.PlatformFeeCredit,
                     ReferenceType = referenceType,
                     ReferenceId = referenceId,
                     Description = $"Platform fee for {referenceType} #{referenceId}",
@@ -623,7 +623,7 @@ public class WalletManager : IWalletManager
             {
                 SystemWalletId = systemWallet.Id,
                 Amount = -feeAmount,
-                Type = SystemTransactionType.ProductFeeRefunded,
+                Type = SystemTransactionType.PlatformFeeRefunded,
                 ReferenceType = "Order",
                 ReferenceId = orderId,
                 Description = $"Platform fee refund for returned order #{orderId}",
