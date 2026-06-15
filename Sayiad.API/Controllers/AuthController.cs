@@ -37,6 +37,9 @@ public class AuthController(IAuthManager authManager) : BaseController
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
+        if (!Request.Headers.ContainsKey("X-Requested-With"))
+            return Forbid();
+
         var refreshToken = Request.Cookies["sayiad_refreshToken"];
         if (string.IsNullOrEmpty(refreshToken))
             return Unauthorized(new { message = "Refresh token not found" });

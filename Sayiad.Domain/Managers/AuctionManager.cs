@@ -558,7 +558,7 @@ public class AuctionManager : IAuctionManager
             Price = request.StartingPrice,
             StockQuantity = 1,
             Status = ProductStatus.Available,
-            CategoryId = 1,
+            CategoryId = request.CategoryId,
             Condition = ProductCondition.New,
             Brand = "",
             Location = "",

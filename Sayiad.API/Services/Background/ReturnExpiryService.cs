@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using Sayiad.Domain.Common;
+
 namespace Sayiad.Api.Services.Background;
 
 public class ReturnExpiryService : BackgroundService
@@ -39,8 +42,16 @@ public class ReturnExpiryService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var orderRepo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-        var notificationManager = scope.ServiceProvider.GetRequiredService<INotificationManager>();
+        var orderManager = scope.ServiceProvider.GetRequiredService<IOrderManager>();
+        var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var appSettings = scope.ServiceProvider.GetRequiredService<IOptions<AppSettings>>().Value;
+        var admin = await userRepo.GetByEmailAsync(appSettings.AdminEmail);
+
+        if (admin is null)
+        {
+            _logger.LogWarning("Admin user {Email} not found — return expiry jobs skipped.", appSettings.AdminEmail);
+            return;
+        }
 
         var cutoff = DateTime.UtcNow.AddDays(-Sayiad.Domain.Constants.FinancialConstants.ProductFreezeDays);
         var expired = await orderRepo.GetPendingReturnRequestsAsync(cutoff);
@@ -51,15 +62,10 @@ public class ReturnExpiryService : BackgroundService
 
             try
             {
-                order.ReturnRequested = false;
-                order.ReturnRequestedAt = null;
-                order.ReturnReason = null;
-                order.Status = OrderStatus.Delivered;
-                order.UpdatedAt = DateTime.UtcNow;
-
-                await notificationManager.CreateAsync(order.BuyerId, "Return Expired",
-                    $"The return window for order #{order.Id} has expired. The return request has been automatically closed.");
-                await unitOfWork.SaveChangesAsync();
+                await orderManager.RejectReturnAsync(
+                    order.Id,
+                    admin.Id,
+                    "Return window expired");
 
                 _logger.LogInformation("Return auto-rejected: Order {OrderId}, Buyer {BuyerId}",
                     order.Id, order.BuyerId);

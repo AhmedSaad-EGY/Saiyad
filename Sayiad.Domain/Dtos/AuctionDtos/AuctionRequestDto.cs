@@ -17,7 +17,8 @@ public record ApproveAuctionRequestRequest(
     DateTime EndTime,
     decimal StartingPrice,
     decimal ReservePrice,
-    decimal BidIncrement
+    decimal BidIncrement,
+    int CategoryId
 );
 
 /// <summary>Auctioneer rejects with a reason.</summary>
