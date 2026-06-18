@@ -418,30 +418,45 @@ public class WalletManager : IWalletManager
         if (amount <= 0)
             throw new InvalidOperationException("Subscription amount must be positive");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
 
-        var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
-            ?? throw new KeyNotFoundException("Wallet not found");
-
-        if (wallet.AvailableBalance < amount)
-            throw new InvalidOperationException("Insufficient balance for subscription upgrade");
-
-        wallet.Balance -= amount;
-        wallet.UpdatedAt = DateTime.UtcNow;
-
-        wallet.Transactions.Add(new WalletTransaction
+        try
         {
-            Amount = -amount,
-            Type = TransactionType.SubscriptionPayment,
-            ReferenceType = "Subscription",
-            ReferenceId = subscriptionId,
-            Description = $"Payment for subscription #{subscriptionId}",
-            BalanceSnapshot = wallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        });
+            var wallet = await _walletRepo.GetByUserIdWithLockAsync(userId)
+                ?? throw new KeyNotFoundException("Wallet not found");
 
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            if (wallet.AvailableBalance < amount)
+                throw new InvalidOperationException("Insufficient balance for subscription upgrade");
+
+            wallet.Balance -= amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            wallet.Transactions.Add(new WalletTransaction
+            {
+                Amount = -amount,
+                Type = TransactionType.SubscriptionPayment,
+                ReferenceType = "Subscription",
+                ReferenceId = subscriptionId,
+                Description = $"Payment for subscription #{subscriptionId}",
+                BalanceSnapshot = wallet.Balance,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (isOwner) await tx.DisposeAsync();
+        }
 
         _logger.LogInformation(
             "Subscription payment: User {UserId}, Amount {Amount}, Subscription {SubscriptionId}",

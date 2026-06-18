@@ -258,6 +258,57 @@ public class WalletManagerTests
     }
 
     // -------------------------------------------------------
+    //  DeductForSubscriptionAsync
+    // -------------------------------------------------------
+
+    [Fact]
+    public async Task DeductForSubscriptionAsync_WhenNoAmbientTransaction_CommitsOwnedTransaction()
+    {
+        var wallet = CreateWallet(UserId, balance: 500m);
+        const int subscriptionId = 33;
+        const decimal amount = 120m;
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(UserId)).ReturnsAsync(wallet);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        await CreateManager().DeductForSubscriptionAsync(UserId, amount, subscriptionId);
+
+        wallet.Balance.Should().Be(380m);
+        wallet.Transactions.Should().ContainSingle(t =>
+            t.Amount == -amount &&
+            t.Type == TransactionType.SubscriptionPayment &&
+            t.ReferenceType == "Subscription" &&
+            t.ReferenceId == subscriptionId);
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _txMock.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _txMock.Verify(t => t.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeductForSubscriptionAsync_WhenAmbientTransactionExists_ReusesItWithoutCommit()
+    {
+        var wallet = CreateWallet(UserId, balance: 500m);
+        const int subscriptionId = 34;
+        const decimal amount = 125m;
+        _unitOfWorkMock.SetupGet(u => u.CurrentTransaction).Returns(_txMock.Object);
+        _walletRepoMock.Setup(r => r.GetByUserIdWithLockAsync(UserId)).ReturnsAsync(wallet);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        await CreateManager().DeductForSubscriptionAsync(UserId, amount, subscriptionId);
+
+        wallet.Balance.Should().Be(375m);
+        wallet.Transactions.Should().ContainSingle(t =>
+            t.Amount == -amount &&
+            t.Type == TransactionType.SubscriptionPayment &&
+            t.ReferenceType == "Subscription" &&
+            t.ReferenceId == subscriptionId);
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _txMock.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _txMock.Verify(t => t.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // -------------------------------------------------------
     //  GetOrCreateWalletAsync (indirect through callers)
     // -------------------------------------------------------
 
