@@ -38,10 +38,12 @@ public class WalletController : BaseController
     }
 
     [HttpGet("transactions")]
-    public async Task<IActionResult> GetTransactions([FromQuery] PaginationRequest pagination)
+    public async Task<IActionResult> GetTransactions([FromQuery] PaginationRequest? pagination)
     {
         var userId = GetUserId();
-        var transactions = await _walletManager.GetTransactionsAsync(userId, pagination);
+        var transactions = await _walletManager.GetTransactionsAsync(
+            userId,
+            pagination ?? new PaginationRequest());
         return Ok(transactions);
     }
 }
