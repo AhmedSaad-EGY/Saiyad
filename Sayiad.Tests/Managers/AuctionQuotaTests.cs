@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Sayiad.Data.Data;
@@ -85,5 +86,124 @@ public class AuctionQuotaTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*monthly auction limit*");
+    }
+
+    [Fact]
+    public async Task ApproveRequest_AtMonthlyLimit_RollsBackAndDoesNotCreateProduct()
+    {
+        var txMock = new Mock<IDbContextTransaction>();
+        txMock.Setup(t => t.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        txMock.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        txMock.Setup(t => t.DisposeAsync()).Returns(ValueTask.CompletedTask);
+
+        var auctionRequest = new AuctionRequest
+        {
+            Id = 50,
+            FishermanId = 7,
+            ProductTitle = "Sea Bass",
+            ProductDescription = "Fresh catch",
+            EstimatedValue = 100,
+            QuantityKg = 2,
+            FishType = "Bass",
+            CatchLocation = "Alexandria",
+            Status = AuctionRequestStatus.Pending
+        };
+        var auctioneer = new User { Id = 9, SubscriptionTier = SubscriptionTier.Free };
+
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(txMock.Object);
+        _auctionRepoMock.Setup(r => r.GetRequestByIdAsync(50)).ReturnsAsync(auctionRequest);
+        _userRepoMock.Setup(r => r.GetByIdAsync(9)).ReturnsAsync(auctioneer);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Free)).ReturnsAsync(FreePlan);
+        _auctionRepoMock.Setup(r => r.GetUserMonthlyAuctionCountAsync(9)).ReturnsAsync(3);
+
+        var manager = CreateManager();
+        var request = new ApproveAuctionRequestRequest(DateTime.UtcNow.AddDays(7), 100, 80, 10, 1);
+
+        var act = () => manager.ApproveRequestAsync(50, 9, request);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Monthly auction limit*");
+
+        _productRepoMock.Verify(r => r.AddAsync(It.IsAny<Product>()), Times.Never);
+        _auctionRepoMock.Verify(r => r.AddAsync(It.IsAny<Auction>()), Times.Never);
+        _auctionRepoMock.Verify(r => r.UpdateRequestAsync(It.IsAny<AuctionRequest>()), Times.Never);
+        txMock.Verify(t => t.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
+        txMock.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ApproveRequest_Success_CommitsProductAuctionAndRequestUpdate()
+    {
+        var txMock = new Mock<IDbContextTransaction>();
+        txMock.Setup(t => t.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        txMock.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        txMock.Setup(t => t.DisposeAsync()).Returns(ValueTask.CompletedTask);
+
+        var auctionRequest = new AuctionRequest
+        {
+            Id = 51,
+            FishermanId = 7,
+            ProductTitle = "Sea Bass",
+            ProductDescription = "Fresh catch",
+            ProductImageUrl = "https://example.test/fish.jpg",
+            EstimatedValue = 100,
+            QuantityKg = 2,
+            FishType = "Bass",
+            CatchLocation = "Alexandria",
+            Status = AuctionRequestStatus.Pending
+        };
+        var auctioneer = new User { Id = 9, SubscriptionTier = SubscriptionTier.Basic };
+        Product? createdProduct = null;
+
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(txMock.Object);
+        _auctionRepoMock.Setup(r => r.GetRequestByIdAsync(51)).ReturnsAsync(auctionRequest);
+        _userRepoMock.Setup(r => r.GetByIdAsync(9)).ReturnsAsync(auctioneer);
+        _planRepoMock.Setup(r => r.GetByTierAsync(SubscriptionTier.Basic)).ReturnsAsync(BasicPlan);
+        _auctionRepoMock.Setup(r => r.GetUserMonthlyAuctionCountAsync(9)).ReturnsAsync(0);
+        _productRepoMock.Setup(r => r.AddAsync(It.IsAny<Product>()))
+            .Callback<Product>(p =>
+            {
+                p.Id = 22;
+                createdProduct = p;
+            })
+            .Returns(Task.CompletedTask);
+        _productRepoMock.Setup(r => r.GetByIdAsync(22))
+            .ReturnsAsync(() => createdProduct);
+        _auctionRepoMock.Setup(r => r.AddAsync(It.IsAny<Auction>()))
+            .Returns(Task.CompletedTask)
+            .Callback<Auction>(a => a.Id = 33);
+        _auctionRepoMock.Setup(r => r.GetByIdWithDetailsAsync(33))
+            .ReturnsAsync(new Auction
+            {
+                Id = 33,
+                ProductId = 22,
+                Product = new Product { Id = 22, Title = "Sea Bass", Images = new List<ProductImage>() },
+                Bids = new List<Bid>(),
+                Status = AuctionStatus.Active
+            });
+        _auctionRepoMock.Setup(r => r.UpdateRequestAsync(It.IsAny<AuctionRequest>()))
+            .ReturnsAsync((AuctionRequest r) => r);
+        _notificationManagerMock.Setup(n => n.CreateAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        var manager = CreateManager();
+        var request = new ApproveAuctionRequestRequest(DateTime.UtcNow.AddDays(7), 100, 80, 10, 1);
+
+        var result = await manager.ApproveRequestAsync(51, 9, request);
+
+        result.Id.Should().Be(33);
+        auctionRequest.Status.Should().Be(AuctionRequestStatus.Approved);
+        auctionRequest.ResultingAuctionId.Should().Be(33);
+        _productRepoMock.Verify(r => r.AddAsync(It.IsAny<Product>()), Times.Once);
+        _auctionRepoMock.Verify(r => r.AddAsync(It.IsAny<Auction>()), Times.Once);
+        _auctionRepoMock.Verify(r => r.UpdateRequestAsync(auctionRequest), Times.Once);
+        _notificationManagerMock.Verify(n => n.CreateAsync(
+            7,
+            "Auction Request Approved",
+            It.Is<string>(m => m.Contains("Auction #33"))), Times.Once);
+        txMock.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        txMock.Verify(t => t.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

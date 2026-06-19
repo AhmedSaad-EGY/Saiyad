@@ -544,62 +544,83 @@ public class AuctionManager : IAuctionManager
     public async Task<AuctionResponse> ApproveRequestAsync(
         int auctionRequestId, int auctioneerId, ApproveAuctionRequestRequest request)
     {
-        var auctionRequest = await _auctionRepo.GetRequestByIdAsync(auctionRequestId)
-            ?? throw new KeyNotFoundException("Auction request not found");
+        var ownsTransaction = _unitOfWork.CurrentTransaction == null;
+        var transaction = ownsTransaction
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
 
-        if (auctionRequest.Status != AuctionRequestStatus.Pending)
-            throw new InvalidOperationException("Only pending requests can be approved.");
-
-        var product = new Product
+        try
         {
-            Title = auctionRequest.ProductTitle,
-            Description = auctionRequest.ProductDescription,
-            SellerId = auctionRequest.FishermanId,
-            Price = request.StartingPrice,
-            StockQuantity = 1,
-            Status = ProductStatus.Available,
-            CategoryId = request.CategoryId,
-            Condition = ProductCondition.New,
-            Brand = "",
-            Location = "",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        if (auctionRequest.ProductImageUrl != null)
-            product.Images.Add(new ProductImage { ImageUrl = auctionRequest.ProductImageUrl, IsPrimary = true });
+            var auctionRequest = await _auctionRepo.GetRequestByIdAsync(auctionRequestId)
+                ?? throw new KeyNotFoundException("Auction request not found");
 
-        await _productRepo.AddAsync(product);
-        await _unitOfWork.SaveChangesAsync();
+            if (auctionRequest.Status != AuctionRequestStatus.Pending)
+                throw new InvalidOperationException("Only pending requests can be approved.");
 
-        var auctioneer = await _userRepo.GetByIdAsync(auctioneerId)
-            ?? throw new KeyNotFoundException("Auctioneer not found");
+            var auctioneer = await _userRepo.GetByIdAsync(auctioneerId)
+                ?? throw new KeyNotFoundException("Auctioneer not found");
 
-        var auctioneerPlan = await _planRepo.GetByTierAsync(auctioneer.SubscriptionTier);
-        var auctioneerLimit = auctioneerPlan?.MaxAuctionsPerMonth ?? 3;
-        var monthlyCount = await _auctionRepo.GetUserMonthlyAuctionCountAsync(auctioneerId);
-        if (monthlyCount >= auctioneerLimit)
-            throw new InvalidOperationException("Monthly auction limit reached. Upgrade subscription.");
+            var auctioneerPlan = await _planRepo.GetByTierAsync(auctioneer.SubscriptionTier);
+            var auctioneerLimit = auctioneerPlan?.MaxAuctionsPerMonth ?? 3;
+            var monthlyCount = await _auctionRepo.GetUserMonthlyAuctionCountAsync(auctioneerId);
+            if (monthlyCount >= auctioneerLimit)
+                throw new InvalidOperationException("Monthly auction limit reached. Upgrade subscription.");
 
-        var createRequest = new CreateAuctionRequest(
-            product.Id, request.EndTime, request.StartingPrice,
-            request.ReservePrice, request.BidIncrement);
+            var product = new Product
+            {
+                Title = auctionRequest.ProductTitle,
+                Description = auctionRequest.ProductDescription,
+                SellerId = auctionRequest.FishermanId,
+                Price = request.StartingPrice,
+                StockQuantity = 1,
+                Status = ProductStatus.Available,
+                CategoryId = request.CategoryId,
+                Condition = ProductCondition.New,
+                Brand = "",
+                Location = "",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            if (auctionRequest.ProductImageUrl != null)
+                product.Images.Add(new ProductImage { ImageUrl = auctionRequest.ProductImageUrl, IsPrimary = true });
 
-        var auction = await CreateAsync(auctioneerId, createRequest);
+            await _productRepo.AddAsync(product);
 
-        auctionRequest.Status = AuctionRequestStatus.Approved;
-        auctionRequest.ReviewedByAuctioneerId = auctioneerId;
-        auctionRequest.ResultingAuctionId = auction.Id;
-        await _auctionRepo.UpdateRequestAsync(auctionRequest);
+            var createRequest = new CreateAuctionRequest(
+                product.Id, request.EndTime, request.StartingPrice,
+                request.ReservePrice, request.BidIncrement);
 
-        await _notificationManager.CreateAsync(
-            auctionRequest.FishermanId,
-            "Auction Request Approved",
-            $"Your auction request for '{auctionRequest.ProductTitle}' was approved! Auction #{auction.Id} is now live.");
+            var auction = await CreateAsync(auctioneerId, createRequest);
 
-        _logger.LogInformation("Auction request {RequestId} approved — auction {AuctionId} created",
-            auctionRequestId, auction.Id);
+            auctionRequest.Status = AuctionRequestStatus.Approved;
+            auctionRequest.ReviewedByAuctioneerId = auctioneerId;
+            auctionRequest.ResultingAuctionId = auction.Id;
+            await _auctionRepo.UpdateRequestAsync(auctionRequest);
 
-        return auction;
+            await _notificationManager.CreateAsync(
+                auctionRequest.FishermanId,
+                "Auction Request Approved",
+                $"Your auction request for '{auctionRequest.ProductTitle}' was approved! Auction #{auction.Id} is now live.");
+
+            if (ownsTransaction)
+                await transaction.CommitAsync();
+
+            _logger.LogInformation("Auction request {RequestId} approved — auction {AuctionId} created",
+                auctionRequestId, auction.Id);
+
+            return auction;
+        }
+        catch
+        {
+            if (ownsTransaction)
+                await transaction.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (ownsTransaction)
+                await transaction.DisposeAsync();
+        }
     }
 
     public async Task<AuctionRequestResponse> RejectRequestAsync(
