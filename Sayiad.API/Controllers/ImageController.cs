@@ -13,6 +13,7 @@ public class ImageController : ControllerBase
         [".jpg"] = "image/jpeg",
         [".jpeg"] = "image/jpeg",
         [".png"] = "image/png",
+        [".gif"] = "image/gif",
         [".webp"] = "image/webp",
     };
 
@@ -35,7 +36,7 @@ public class ImageController : ControllerBase
         var fullPath = Path.GetFullPath(Path.Combine(basePath, "uploads", folder, fileName));
         var uploadsDir = Path.GetFullPath(Path.Combine(basePath, "uploads"));
 
-        if (!fullPath.StartsWith(uploadsDir, StringComparison.OrdinalIgnoreCase))
+        if (!fullPath.StartsWith(uploadsDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             return BadRequest("Invalid path");
 
         if (!System.IO.File.Exists(fullPath))

@@ -8,7 +8,14 @@ public class UploadController(IFileStorageService fileStorage, ILogger<UploadCon
     private readonly IFileStorageService _fileStorage = fileStorage;
     private readonly ILogger<UploadController> _logger = logger;
     private const long MaxFileSize = 5 * 1024 * 1024;
-    private static readonly string[] AllowedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
+    private static readonly Dictionary<string, string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".png"] = "image/png",
+        [".gif"] = "image/gif",
+        [".webp"] = "image/webp",
+    };
 
     [HttpPost]
     [RequestSizeLimit(5 * 1024 * 1024)]
@@ -23,14 +30,18 @@ public class UploadController(IFileStorageService fileStorage, ILogger<UploadCon
                 return BadRequest("File size exceeds 5 MB limit");
 
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!AllowedExtensions.Contains(ext))
-                return BadRequest("Only jpg, jpeg, png, webp files are allowed");
+            if (!AllowedImageTypes.ContainsKey(ext))
+                return BadRequest("Only jpg, jpeg, png, gif, webp files are allowed");
+
+            if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+                !string.Equals(file.ContentType, AllowedImageTypes[ext], StringComparison.OrdinalIgnoreCase))
+                return BadRequest("File content does not match a valid image format.");
 
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
 
-            if (!IsValidImageBytes(memoryStream))
+            if (!IsValidImageBytes(memoryStream, ext))
                 return BadRequest("File content does not match a valid image format.");
 
             memoryStream.Position = 0;
@@ -45,28 +56,34 @@ public class UploadController(IFileStorageService fileStorage, ILogger<UploadCon
         }
     }
 
-    private static bool IsValidImageBytes(Stream stream)
+    private static bool IsValidImageBytes(Stream stream, string extension)
     {
         using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
-        var bytes = reader.ReadBytes(4);
+        var bytes = reader.ReadBytes(12);
 
-        // JPEG: FF D8 FF
-        if (bytes.Length >= 3 &&
-            bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-            return true;
+        return extension switch
+        {
+            ".jpg" or ".jpeg" => bytes.Length >= 3 &&
+                bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
 
-        // PNG: 89 50 4E 47
-        if (bytes.Length >= 4 &&
-            bytes[0] == 0x89 && bytes[1] == 0x50 &&
-            bytes[2] == 0x4E && bytes[3] == 0x47)
-            return true;
+            ".png" => bytes.Length >= 8 &&
+                bytes[0] == 0x89 && bytes[1] == 0x50 &&
+                bytes[2] == 0x4E && bytes[3] == 0x47 &&
+                bytes[4] == 0x0D && bytes[5] == 0x0A &&
+                bytes[6] == 0x1A && bytes[7] == 0x0A,
 
-        // WebP: RIFF....WEBP — first 4 bytes are 52 49 46 46
-        if (bytes.Length >= 4 &&
-            bytes[0] == 0x52 && bytes[1] == 0x49 &&
-            bytes[2] == 0x46 && bytes[3] == 0x46)
-            return true;
+            ".gif" => bytes.Length >= 6 &&
+                bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 &&
+                bytes[3] == 0x38 && (bytes[4] == 0x37 || bytes[4] == 0x39) &&
+                bytes[5] == 0x61,
 
-        return false;
+            ".webp" => bytes.Length >= 12 &&
+                bytes[0] == 0x52 && bytes[1] == 0x49 &&
+                bytes[2] == 0x46 && bytes[3] == 0x46 &&
+                bytes[8] == 0x57 && bytes[9] == 0x45 &&
+                bytes[10] == 0x42 && bytes[11] == 0x50,
+
+            _ => false,
+        };
     }
 }
