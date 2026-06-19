@@ -20,7 +20,7 @@ public class WalletController : BaseController
         return Ok(wallet);
     }
 
-    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}")]
+    [Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
     [HttpPost("deposit")]
     public async Task<IActionResult> Deposit([FromBody] DepositRequest request)
     {
