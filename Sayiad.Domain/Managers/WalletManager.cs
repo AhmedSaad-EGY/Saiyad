@@ -260,98 +260,113 @@ public class WalletManager : IWalletManager
         if (winningAmount <= 0)
             throw new InvalidOperationException("Winning amount must be positive");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
+        var isOwner = _unitOfWork.CurrentTransaction == null;
+        var tx = isOwner
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
 
-        var winnerWallet = await _walletRepo.GetByUserIdWithLockAsync(winnerId)
-            ?? throw new KeyNotFoundException("Winner wallet not found");
-        var sellerWallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
-            ?? throw new KeyNotFoundException("Seller wallet not found");
-
-        // N-02: 3-way split from FinancialConstants
-        var sellerAmount = winningAmount * FinancialConstants.AuctionFishermanShare;
-        var auctioneerAmount = winningAmount * FinancialConstants.AuctionAuctioneerFee;
-        var platformAmount = winningAmount * FinancialConstants.AuctionPlatformFee;
-
-        // Deduct from winner
-        if (winnerWallet.AvailableBalance < winningAmount)
-            throw new InvalidOperationException("Winner has insufficient available balance to settle auction payment");
-
-        winnerWallet.Balance -= winningAmount;
-        winnerWallet.HeldBalance = Math.Max(0, winnerWallet.HeldBalance - winningAmount);
-        winnerWallet.UpdatedAt = DateTime.UtcNow;
-
-        winnerWallet.Transactions.Add(new WalletTransaction
+        try
         {
-            Amount = -winningAmount,
-            Type = TransactionType.AuctioneerFee,
-            ReferenceType = "Auction",
-            ReferenceId = auctionId,
-            Description = $"Payment for winning auction #{auctionId}",
-            BalanceSnapshot = winnerWallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        });
+            var winnerWallet = await _walletRepo.GetByUserIdWithLockAsync(winnerId)
+                ?? throw new KeyNotFoundException("Winner wallet not found");
+            var sellerWallet = await _walletRepo.GetByUserIdWithLockAsync(sellerId)
+                ?? throw new KeyNotFoundException("Seller wallet not found");
 
-        // Credit seller (no freeze — auction delivery is in-person)
-        sellerWallet.Balance += sellerAmount;
-        sellerWallet.UpdatedAt = DateTime.UtcNow;
+            // N-02: 3-way split from FinancialConstants
+            var sellerAmount = winningAmount * FinancialConstants.AuctionFishermanShare;
+            var auctioneerAmount = winningAmount * FinancialConstants.AuctionAuctioneerFee;
+            var platformAmount = winningAmount * FinancialConstants.AuctionPlatformFee;
 
-        sellerWallet.Transactions.Add(new WalletTransaction
-        {
-            Amount = sellerAmount,
-            Type = TransactionType.SellerCredit,
-            ReferenceType = "Auction",
-            ReferenceId = auctionId,
-            Description = $"Payout for auction #{auctionId} ({FinancialConstants.AuctionFishermanShare:P0})",
-            BalanceSnapshot = sellerWallet.Balance,
-            CreatedAt = DateTime.UtcNow
-        });
+            // Deduct from winner
+            if (winnerWallet.AvailableBalance < winningAmount)
+                throw new InvalidOperationException("Winner has insufficient available balance to settle auction payment");
 
-        // Credit auctioneer
-        var auctioneerWallet = await _walletRepo.GetByUserIdWithLockAsync(auctioneerId);
-        if (auctioneerWallet != null)
-        {
-            auctioneerWallet.Balance += auctioneerAmount;
-            auctioneerWallet.UpdatedAt = DateTime.UtcNow;
+            winnerWallet.Balance -= winningAmount;
+            winnerWallet.HeldBalance = Math.Max(0, winnerWallet.HeldBalance - winningAmount);
+            winnerWallet.UpdatedAt = DateTime.UtcNow;
 
-            auctioneerWallet.Transactions.Add(new WalletTransaction
+            winnerWallet.Transactions.Add(new WalletTransaction
             {
-                Amount = auctioneerAmount,
+                Amount = -winningAmount,
                 Type = TransactionType.AuctioneerFee,
                 ReferenceType = "Auction",
                 ReferenceId = auctionId,
-                Description = $"Auctioneer fee for auction #{auctionId} ({FinancialConstants.AuctionAuctioneerFee:P0})",
-                BalanceSnapshot = auctioneerWallet.Balance,
+                Description = $"Payment for winning auction #{auctionId}",
+                BalanceSnapshot = winnerWallet.Balance,
                 CreatedAt = DateTime.UtcNow
             });
-        }
 
-        // Credit platform via SystemWallet
-        var systemWallet = await _systemWalletRepo.GetWithLockAsync();
-        if (systemWallet != null)
-        {
-            systemWallet.Balance += platformAmount;
-            systemWallet.UpdatedAt = DateTime.UtcNow;
+            // Credit seller (no freeze — auction delivery is in-person)
+            sellerWallet.Balance += sellerAmount;
+            sellerWallet.UpdatedAt = DateTime.UtcNow;
 
-            await _systemWalletRepo.AddTransactionAsync(new SystemWalletTransaction
+            sellerWallet.Transactions.Add(new WalletTransaction
             {
-                SystemWalletId = systemWallet.Id,
-                Amount = platformAmount,
-                Type = SystemTransactionType.AuctioneerFeeCredit,
+                Amount = sellerAmount,
+                Type = TransactionType.SellerCredit,
                 ReferenceType = "Auction",
                 ReferenceId = auctionId,
-                Description = $"Platform fee for auction #{auctionId} ({FinancialConstants.AuctionPlatformFee:P0})",
-                BalanceSnapshot = systemWallet.Balance,
+                Description = $"Payout for auction #{auctionId} ({FinancialConstants.AuctionFishermanShare:P0})",
+                BalanceSnapshot = sellerWallet.Balance,
                 CreatedAt = DateTime.UtcNow
             });
+
+            // Credit auctioneer
+            var auctioneerWallet = await _walletRepo.GetByUserIdWithLockAsync(auctioneerId);
+            if (auctioneerWallet != null)
+            {
+                auctioneerWallet.Balance += auctioneerAmount;
+                auctioneerWallet.UpdatedAt = DateTime.UtcNow;
+
+                auctioneerWallet.Transactions.Add(new WalletTransaction
+                {
+                    Amount = auctioneerAmount,
+                    Type = TransactionType.AuctioneerFee,
+                    ReferenceType = "Auction",
+                    ReferenceId = auctionId,
+                    Description = $"Auctioneer fee for auction #{auctionId} ({FinancialConstants.AuctionAuctioneerFee:P0})",
+                    BalanceSnapshot = auctioneerWallet.Balance,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Credit platform via SystemWallet
+            var systemWallet = await _systemWalletRepo.GetWithLockAsync();
+            if (systemWallet != null)
+            {
+                systemWallet.Balance += platformAmount;
+                systemWallet.UpdatedAt = DateTime.UtcNow;
+
+                await _systemWalletRepo.AddTransactionAsync(new SystemWalletTransaction
+                {
+                    SystemWalletId = systemWallet.Id,
+                    Amount = platformAmount,
+                    Type = SystemTransactionType.AuctioneerFeeCredit,
+                    ReferenceType = "Auction",
+                    ReferenceId = auctionId,
+                    Description = $"Platform fee for auction #{auctionId} ({FinancialConstants.AuctionPlatformFee:P0})",
+                    BalanceSnapshot = systemWallet.Balance,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            if (isOwner) await tx.CommitAsync();
+
+            _logger.LogInformation(
+                "Auction payment settled: Winner {WinnerId}, Seller {SellerId}, " +
+                "Amount {Amount}, SellerShare {SellerShare}, AuctioneerShare {AuctioneerShare}, PlatformShare {PlatformShare}, Auction {AuctionId}",
+                winnerId, sellerId, winningAmount, sellerAmount, auctioneerAmount, platformAmount, auctionId);
         }
-
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
-
-        _logger.LogInformation(
-            "Auction payment settled: Winner {WinnerId}, Seller {SellerId}, " +
-            "Amount {Amount}, SellerShare {SellerShare}, AuctioneerShare {AuctioneerShare}, PlatformShare {PlatformShare}, Auction {AuctionId}",
-            winnerId, sellerId, winningAmount, sellerAmount, auctioneerAmount, platformAmount, auctionId);
+        catch
+        {
+            if (isOwner) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (isOwner) await tx.DisposeAsync();
+        }
     }
 
     public async Task CreditPlatformFeeAsync(int platformUserId, decimal amount, string referenceType, int referenceId)

@@ -55,51 +55,66 @@ public class OrderManager : IOrderManager
         _ = await GetShippingAddressAsync(userId, request.ShippingAddressId);
 
         var productCache = new Dictionary<int, Product>();
+        var ownsTransaction = _unitOfWork.CurrentTransaction == null;
+        var transaction = ownsTransaction
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
+        Order order = null!;
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
-
-        foreach (var item in cart.CartItems)
+        try
         {
-            var product = await _productRepo.GetByIdAsync(item.ProductId)
-                ?? throw new KeyNotFoundException($"Product #{item.ProductId} not found");
-
-            if (product.StockQuantity < item.Quantity)
-                throw new InvalidOperationException(
-                    $"Insufficient stock for {item.Product.Title}");
-
-            productCache[item.ProductId] = product;
-        }
-
-        var order = new Order
-        {
-            BuyerId = userId,
-            ShippingAddressId = request.ShippingAddressId,
-            Status = OrderStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        foreach (var cartItem in cart.CartItems)
-        {
-            var product = productCache[cartItem.ProductId];
-            var subtotal = product.Price * cartItem.Quantity;
-            order.TotalPrice += subtotal;
-
-            order.OrderItems.Add(new OrderItem
+            foreach (var item in cart.CartItems)
             {
-                ProductId = cartItem.ProductId,
-                SellerId = product.SellerId,
-                Quantity = cartItem.Quantity,
-                UnitPrice = product.Price,
-                Subtotal = subtotal,
-                CreatedAt = DateTime.UtcNow
-            });
+                var product = await _productRepo.GetByIdAsync(item.ProductId)
+                    ?? throw new KeyNotFoundException($"Product #{item.ProductId} not found");
+
+                if (product.StockQuantity < item.Quantity)
+                    throw new InvalidOperationException(
+                        $"Insufficient stock for {item.Product.Title}");
+
+                productCache[item.ProductId] = product;
+            }
+
+            order = new Order
+            {
+                BuyerId = userId,
+                ShippingAddressId = request.ShippingAddressId,
+                Status = OrderStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            foreach (var cartItem in cart.CartItems)
+            {
+                var product = productCache[cartItem.ProductId];
+                var subtotal = product.Price * cartItem.Quantity;
+                order.TotalPrice += subtotal;
+
+                order.OrderItems.Add(new OrderItem
+                {
+                    ProductId = cartItem.ProductId,
+                    SellerId = product.SellerId,
+                    Quantity = cartItem.Quantity,
+                    UnitPrice = product.Price,
+                    Subtotal = subtotal,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            order = await _orderRepo.CreateOrderTransactionAsync(order, userId);
+
+            await _unitOfWork.SaveChangesAsync();
+            if (ownsTransaction) await transaction.CommitAsync();
         }
-
-        order = await _orderRepo.CreateOrderTransactionAsync(order, userId);
-
-        await _unitOfWork.SaveChangesAsync();
-        await transaction.CommitAsync();
+        catch
+        {
+            if (ownsTransaction) await transaction.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (ownsTransaction) await transaction.DisposeAsync();
+        }
 
         await _notificationManager.CreateAsync(userId, "Order Placed",
             $"Your order #{order.Id} has been placed successfully.");

@@ -50,29 +50,45 @@ public class PaymentManager : IPaymentManager
         if (order.Status != OrderStatus.Pending)
             throw new InvalidOperationException("Cannot initiate payment: order is not in Pending status.");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
+        var ownsTransaction = _unitOfWork.CurrentTransaction == null;
+        var tx = ownsTransaction
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
 
-        var payment = new Payment
+        Payment payment = null!;
+        try
         {
-            OrderId = request.OrderId,
-            Amount = order.TotalPrice,
-            PaymentMethod = request.PaymentMethod,
-            PaymentStatus = PaymentStatus.Pending,
-            CreatedAt = DateTime.UtcNow
-        };
+            payment = new Payment
+            {
+                OrderId = request.OrderId,
+                Amount = order.TotalPrice,
+                PaymentMethod = request.PaymentMethod,
+                PaymentStatus = PaymentStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        var transaction = new Transaction
+            var transaction = new Transaction
+            {
+                TransactionReference = $"TXN-{Guid.NewGuid():N}"[..20],
+                Amount = order.TotalPrice,
+                Status = "Initiated",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            payment.Transactions.Add(transaction);
+            await _paymentRepo.AddAsync(payment);
+            await _unitOfWork.SaveChangesAsync();
+            if (ownsTransaction) await tx.CommitAsync();
+        }
+        catch
         {
-            TransactionReference = $"TXN-{Guid.NewGuid():N}"[..20],
-            Amount = order.TotalPrice,
-            Status = "Initiated",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        payment.Transactions.Add(transaction);
-        await _paymentRepo.AddAsync(payment);
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
+            if (ownsTransaction) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (ownsTransaction) await tx.DisposeAsync();
+        }
 
         _logger.LogInformation("Payment initiated: {PaymentId} for order {OrderId}", payment.Id, request.OrderId);
         return MapToResponse(payment);
@@ -89,68 +105,83 @@ public class PaymentManager : IPaymentManager
         if (payment.PaymentStatus != PaymentStatus.Pending)
             throw new InvalidOperationException("Cannot confirm payment: current status is not Pending.");
 
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-
-        payment.PaymentStatus = PaymentStatus.Confirmed;
-        payment.PaidAt = DateTime.UtcNow;
-
-        var transaction = new Transaction
-        {
-            TransactionReference = $"TXN-{Guid.NewGuid():N}"[..20],
-            Amount = payment.Amount,
-            Status = "Completed",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        payment.Transactions.Add(transaction);
-        payment.Order.Status = OrderStatus.Paid;
-        payment.Order.UpdatedAt = DateTime.UtcNow;
-
-        if (payment.Order.OrderType == OrderType.Auction && payment.Order.AuctionId.HasValue)
-        {
-            // Auction flow: use SettleAuctionPaymentAsync with 3-way split
-            var auctionSellerId = payment.Order.OrderItems.FirstOrDefault()?.SellerId;
-            if (auctionSellerId.HasValue && payment.Order.AuctionId.HasValue)
-            {
-                var auction = await _auctionRepo.GetByIdAsync(payment.Order.AuctionId.Value);
-                var auctioneerId = auction?.CreatedByUserId ?? 0;
-
-                await _walletManager.SettleAuctionPaymentAsync(
-                    payment.Order.BuyerId, auctionSellerId.Value, payment.Order.TotalPrice, payment.Order.AuctionId.Value, auctioneerId);
-            }
-        }
-        else
-        {
-            // Standard product flow
-            await _walletManager.DeductForOrderAsync(payment.Order.BuyerId, payment.Order.TotalPrice, payment.Order.Id);
-
-            var admin = await _userRepo.GetByEmailAsync(_settings.Value.AdminEmail);
-            var adminId = admin?.Id;
-
-            var sellerGroups = payment.Order.OrderItems.GroupBy(i => i.SellerId);
-            foreach (var sellerGroup in sellerGroups)
-            {
-                var sellerTotal = sellerGroup.Sum(i => i.Subtotal > 0 ? i.Subtotal : i.UnitPrice * i.Quantity);
-                var fee = sellerTotal * FinancialConstants.ProductPlatformFee;
-
-                // Pass FULL sellerTotal — CreditSellerAsync calculates 95% internally
-                await _walletManager.CreditSellerAsync(sellerGroup.Key, sellerTotal, payment.Order.Id);
-                if (adminId.HasValue)
-                    await _walletManager.CreditPlatformFeeAsync(adminId.Value, fee, "Order", payment.Order.Id);
-            }
-        }
+        var ownsTransaction = _unitOfWork.CurrentTransaction == null;
+        var tx = ownsTransaction
+            ? await _unitOfWork.BeginTransactionAsync()
+            : _unitOfWork.CurrentTransaction!;
 
         try
         {
-            await _unitOfWork.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new InvalidOperationException(
-                "Payment was already confirmed by another request. Duplicate confirmation prevented.");
-        }
+            payment.PaymentStatus = PaymentStatus.Confirmed;
+            payment.PaidAt = DateTime.UtcNow;
 
-        await tx.CommitAsync();
+            var transaction = new Transaction
+            {
+                TransactionReference = $"TXN-{Guid.NewGuid():N}"[..20],
+                Amount = payment.Amount,
+                Status = "Completed",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            payment.Transactions.Add(transaction);
+            payment.Order.Status = OrderStatus.Paid;
+            payment.Order.UpdatedAt = DateTime.UtcNow;
+
+            if (payment.Order.OrderType == OrderType.Auction && payment.Order.AuctionId.HasValue)
+            {
+                // Auction flow: use SettleAuctionPaymentAsync with 3-way split
+                var auctionSellerId = payment.Order.OrderItems.FirstOrDefault()?.SellerId;
+                if (auctionSellerId.HasValue && payment.Order.AuctionId.HasValue)
+                {
+                    var auction = await _auctionRepo.GetByIdAsync(payment.Order.AuctionId.Value);
+                    var auctioneerId = auction?.CreatedByUserId ?? 0;
+
+                    await _walletManager.SettleAuctionPaymentAsync(
+                        payment.Order.BuyerId, auctionSellerId.Value, payment.Order.TotalPrice, payment.Order.AuctionId.Value, auctioneerId);
+                }
+            }
+            else
+            {
+                // Standard product flow
+                await _walletManager.DeductForOrderAsync(payment.Order.BuyerId, payment.Order.TotalPrice, payment.Order.Id);
+
+                var admin = await _userRepo.GetByEmailAsync(_settings.Value.AdminEmail);
+                var adminId = admin?.Id;
+
+                var sellerGroups = payment.Order.OrderItems.GroupBy(i => i.SellerId);
+                foreach (var sellerGroup in sellerGroups)
+                {
+                    var sellerTotal = sellerGroup.Sum(i => i.Subtotal > 0 ? i.Subtotal : i.UnitPrice * i.Quantity);
+                    var fee = sellerTotal * FinancialConstants.ProductPlatformFee;
+
+                    // Pass FULL sellerTotal — CreditSellerAsync calculates 95% internally
+                    await _walletManager.CreditSellerAsync(sellerGroup.Key, sellerTotal, payment.Order.Id);
+                    if (adminId.HasValue)
+                        await _walletManager.CreditPlatformFeeAsync(adminId.Value, fee, "Order", payment.Order.Id);
+                }
+            }
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new InvalidOperationException(
+                    "Payment was already confirmed by another request. Duplicate confirmation prevented.");
+            }
+
+            if (ownsTransaction) await tx.CommitAsync();
+        }
+        catch
+        {
+            if (ownsTransaction) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (ownsTransaction) await tx.DisposeAsync();
+        }
 
         _logger.LogInformation("Payment confirmed: {PaymentId}", paymentId);
         return MapToResponse(payment);

@@ -8,11 +8,16 @@ public class OrdersController : BaseController
 {
     private readonly IOrderManager _orderManager;
     private readonly IPaymentManager _paymentManager;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public OrdersController(IOrderManager orderManager, IPaymentManager paymentManager)
+    public OrdersController(
+        IOrderManager orderManager,
+        IPaymentManager paymentManager,
+        IUnitOfWork unitOfWork)
     {
         _orderManager = orderManager;
         _paymentManager = paymentManager;
+        _unitOfWork = unitOfWork;
     }
 
     [HttpPost]
@@ -107,16 +112,26 @@ public class OrdersController : BaseController
     {
         var userId = GetUserId();
 
-        // 1. Create order from cart
-        var createRequest = new CreateOrderRequest(request.ShippingAddressId);
-        var order = await _orderManager.CreateFromCartAsync(userId, createRequest);
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            // 1. Create order from cart
+            var createRequest = new CreateOrderRequest(request.ShippingAddressId);
+            var order = await _orderManager.CreateFromCartAsync(userId, createRequest);
 
-        // 2. Initiate payment
-        var payment = await _paymentManager.InitiateAsync(userId, new InitiatePaymentRequest(order.Id, request.PaymentMethod));
+            // 2. Initiate payment
+            var payment = await _paymentManager.InitiateAsync(userId, new InitiatePaymentRequest(order.Id, request.PaymentMethod));
 
-        // 3. Confirm payment (handles wallet deduction, seller credit, platform fee)
-        await _paymentManager.ConfirmAsync(payment.Id, userId);
+            // 3. Confirm payment (handles wallet deduction, seller credit, platform fee)
+            await _paymentManager.ConfirmAsync(payment.Id, userId);
 
-        return Ok(new CheckoutResponse(order.Id, "Confirmed", order.TotalPrice));
+            await transaction.CommitAsync();
+            return Ok(new CheckoutResponse(order.Id, "Confirmed", order.TotalPrice));
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
