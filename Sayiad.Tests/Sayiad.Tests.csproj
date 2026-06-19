@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sayiad.Domain\Sayiad.Domain.csproj" />
+    <ProjectReference Include="..\Sayiad.API\Sayiad.Api.csproj" />
   </ItemGroup>
 
 </Project>
