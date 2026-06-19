@@ -2,10 +2,12 @@
 namespace Sayiad.Api.Controllers;
 
 [ApiController]
-    [Route("api/[controller]")]
-[Authorize(Roles = $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)},{nameof(UserRole.Admin)}")]
+[Route("api/[controller]")]
 public class OrdersController : BaseController
 {
+    private const string EcommerceRoles =
+        $"{nameof(UserRole.Customer)},{nameof(UserRole.Fisherman)},{nameof(UserRole.BaitSeller)},{nameof(UserRole.Auctioneer)}";
+
     private readonly IOrderManager _orderManager;
     private readonly IPaymentManager _paymentManager;
     private readonly IUnitOfWork _unitOfWork;
@@ -20,6 +22,7 @@ public class OrdersController : BaseController
         _unitOfWork = unitOfWork;
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpPost]
     public async Task<IActionResult> Create(CreateOrderRequest request)
     {
@@ -28,6 +31,7 @@ public class OrdersController : BaseController
         return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpGet]
     public async Task<IActionResult> GetMyOrders([FromQuery] PaginationRequest? pagination)
     {
@@ -36,6 +40,7 @@ public class OrdersController : BaseController
         return Ok(orders);
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpGet("seller")]
     public async Task<IActionResult> GetSellerOrders()
     {
@@ -44,6 +49,7 @@ public class OrdersController : BaseController
         return Ok(orders);
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -52,6 +58,7 @@ public class OrdersController : BaseController
         return Ok(order);
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpPut("{id}/cancel")]
     public async Task<IActionResult> Cancel(int id)
     {
@@ -77,6 +84,7 @@ public class OrdersController : BaseController
         return Ok(order);
     }
 
+    [Authorize(Roles = EcommerceRoles)]
     [HttpPost("{id}/request-return")]
     public async Task<IActionResult> RequestReturn(int id)
     {
@@ -107,6 +115,7 @@ public class OrdersController : BaseController
     /// Single atomic checkout: creates order + initiates + confirms payment in one request.
     /// Eliminates the 3-step frontend chain that could leave orders in a partial state.
     /// </summary>
+    [Authorize(Roles = EcommerceRoles)]
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout(CheckoutRequest request)
     {

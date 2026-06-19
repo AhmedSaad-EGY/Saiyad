@@ -87,6 +87,48 @@ public class ProductManagerTests
     }
 
     [Fact]
+    public async Task UpdateAsync_LiveProductByOwner_ResetsStatusToPendingReview()
+    {
+        var product = new Product
+        {
+            Id = 1,
+            SellerId = 7,
+            Price = 100m,
+            Status = ProductStatus.Available,
+            ReviewedByUserId = 99,
+            ReviewedAt = DateTime.UtcNow.AddDays(-1),
+            RejectionReason = "Old",
+            Category = new Category { Id = 1, Name = "Test" }
+        };
+        _repoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(product);
+
+        await CreateManager().UpdateAsync(1, 7, new UpdateProductRequest("T", "D", "B", ProductCondition.New, 200m, 10, "Loc", 1, ProductStatus.Available));
+
+        product.Status.Should().Be(ProductStatus.PendingReview);
+        product.ReviewedByUserId.Should().BeNull();
+        product.ReviewedAt.Should().BeNull();
+        product.RejectionReason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NonLiveProductByOwner_PreservesCurrentStatus()
+    {
+        var product = new Product
+        {
+            Id = 1,
+            SellerId = 7,
+            Price = 100m,
+            Status = ProductStatus.Draft,
+            Category = new Category { Id = 1, Name = "Test" }
+        };
+        _repoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(product);
+
+        await CreateManager().UpdateAsync(1, 7, new UpdateProductRequest("T", "D", "B", ProductCondition.New, 200m, 10, "Loc", 1, ProductStatus.Available));
+
+        product.Status.Should().Be(ProductStatus.Draft);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenPriceDecreases_UpdatesSuccessfully()
     {
         var product = new Product { Id = 1, SellerId = 7, Price = 200m, Category = new Category { Id = 1, Name = "Test" } };

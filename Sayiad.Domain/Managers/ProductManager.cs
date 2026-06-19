@@ -115,6 +115,16 @@ public class ProductManager : IProductManager
         product.StockQuantity = request.StockQuantity;
         product.Location = InputSanitizer.SanitizeNullable(request.Location) ?? string.Empty;
         product.CategoryId = request.CategoryId;
+
+        // Seller edits to a live product must be reviewed again before staying public.
+        if (product.Status == ProductStatus.Available)
+        {
+            product.Status = ProductStatus.PendingReview;
+            product.ReviewedByUserId = null;
+            product.ReviewedAt = null;
+            product.RejectionReason = null;
+        }
+
         product.UpdatedAt = DateTime.UtcNow;
 
         await _repo.UpdateAsync(product);
