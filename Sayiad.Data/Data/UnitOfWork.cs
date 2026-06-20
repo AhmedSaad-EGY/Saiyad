@@ -2,11 +2,9 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Sayiad.Data.Data;
 
-public class UnitOfWork : IUnitOfWork
+public class UnitOfWork(ApplicationDbContext db) : IUnitOfWork
 {
-    private readonly ApplicationDbContext _db;
-
-    public UnitOfWork(ApplicationDbContext db) => _db = db;
+    private readonly ApplicationDbContext _db = db;
 
     public IDbContextTransaction? CurrentTransaction => _db.Database.CurrentTransaction;
 
