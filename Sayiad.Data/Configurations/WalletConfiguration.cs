@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
 namespace Sayiad.Data.Configurations;
 
 public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
@@ -32,7 +34,7 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
         builder.Property(t => t.Type)
             .HasMaxLength(25)
             .IsRequired()
-            .HasConversion<string>();
+            .HasConversion<TransactionTypeValueConverter>();
         builder.Property(t => t.ReferenceType).HasMaxLength(50).IsRequired();
         builder.Property(t => t.Description).HasMaxLength(500);
         builder.Property(t => t.BalanceSnapshot).HasColumnType("decimal(18,2)");
@@ -45,5 +47,22 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
 
         builder.HasIndex(t => t.WalletId);
         builder.HasIndex(t => t.CreatedAt);
+    }
+}
+
+public sealed class TransactionTypeValueConverter : ValueConverter<TransactionType, string>
+{
+    public TransactionTypeValueConverter()
+        : base(
+            type => type.ToString(),
+            value => ParseStoredValue(value))
+    {
+    }
+
+    private static TransactionType ParseStoredValue(string value)
+    {
+        return value == "Hold"
+            ? TransactionType.HoldDeduction
+            : Enum.Parse<TransactionType>(value);
     }
 }
