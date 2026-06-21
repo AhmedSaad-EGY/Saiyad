@@ -1,9 +1,15 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Sayiad.Api.Controllers;
+using Sayiad.Api.Filters;
 using Sayiad.Domain.Contracts;
 
 namespace Sayiad.Tests.Controllers;
@@ -79,6 +85,71 @@ public class UploadControllerTests
 
         result.Should().BeOfType<OkObjectResult>();
         _storageMock.Verify(s => s.UploadAsync(It.IsAny<Stream>(), It.IsAny<string>(), "sayiad/profiles"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Upload_MissingFile_ReturnsBadRequestAndDoesNotStore()
+    {
+        var result = await CreateController().Upload(null!);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _storageMock.Verify(s => s.UploadAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Upload_InvalidExtension_ReturnsBadRequestAndDoesNotStore()
+    {
+        var file = CreateFormFile(
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+            "image.txt",
+            "text/plain");
+
+        var result = await CreateController().Upload(file);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _storageMock.Verify(s => s.UploadAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Upload_OversizedFile_ReturnsBadRequestAndDoesNotStore()
+    {
+        var file = new Mock<IFormFile>();
+        file.SetupGet(f => f.Length).Returns((5 * 1024 * 1024) + 1);
+
+        var result = await CreateController().Upload(file.Object);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _storageMock.Verify(s => s.UploadAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void RequireValidatorFilter_FormFileArgument_SkipsDtoValidatorRequirement()
+    {
+        var services = new ServiceCollection();
+        using var provider = services.BuildServiceProvider();
+        var filter = new RequireValidatorFilter(provider, Mock.Of<ILogger<RequireValidatorFilter>>());
+        var actionContext = new ActionContext(
+            new DefaultHttpContext(),
+            new RouteData(),
+            new ActionDescriptor(),
+            new ModelStateDictionary());
+        var file = CreateFormFile(
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+            "valid.png",
+            "image/png");
+        var filterContext = new ActionExecutingContext(
+            actionContext,
+            [],
+            new Dictionary<string, object?> { ["file"] = file },
+            new object());
+
+        filter.OnActionExecuting(filterContext);
+
+        filterContext.Result.Should().BeNull();
+        filterContext.ModelState.IsValid.Should().BeTrue();
+        filterContext.ModelState.Values
+            .SelectMany(value => value.Errors)
+            .Should().NotContain(error => error.ErrorMessage.Contains("Validation is not configured"));
     }
 
     private static IFormFile CreateFormFile(byte[] bytes, string fileName, string contentType)

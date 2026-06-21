@@ -19,6 +19,7 @@ public class RequireValidatorFilter : IActionFilter
         foreach (var (key, value) in context.ActionArguments)
         {
             if (value is null) continue;
+            if (value is IFormFile) continue;
             var type = value.GetType();
             if (type.IsPrimitive || type == typeof(string) || type.IsEnum) continue;
 
