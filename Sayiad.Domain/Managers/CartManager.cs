@@ -30,6 +30,9 @@ public class CartManager : ICartManager
         var product = await _productRepo.GetByIdAsync(request.ProductId)
             ?? throw new KeyNotFoundException("Product not found");
 
+        if (product.IsAuctioned)
+            throw new InvalidOperationException("Auction items cannot be purchased directly. Please bid through the auction.");
+
         if (product.Status != ProductStatus.Available)
             throw new InvalidOperationException("Product is not available");
 

@@ -20,7 +20,7 @@ public class ProductRepository : IProductRepository
             .Include(p => p.Category)
             .Include(p => p.Seller)
             .Include(p => p.Images)
-            .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available)
+            .Where(p => p.DeletedAt == null && p.Status == ProductStatus.Available && !p.IsAuctioned)
             .AsQueryable();
 
         if (filter.CategoryId.HasValue)

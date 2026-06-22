@@ -68,6 +68,10 @@ public class OrderManager : IOrderManager
                 var product = await _productRepo.GetByIdAsync(item.ProductId)
                     ?? throw new KeyNotFoundException($"Product #{item.ProductId} not found");
 
+                if (product.IsAuctioned)
+                    throw new InvalidOperationException(
+                        "Auction items cannot be purchased directly. Please bid through the auction.");
+
                 if (product.StockQuantity < item.Quantity)
                     throw new InvalidOperationException(
                         $"Insufficient stock for {item.Product.Title}");
