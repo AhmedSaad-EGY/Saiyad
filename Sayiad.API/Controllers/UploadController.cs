@@ -19,7 +19,7 @@ public class UploadController(IFileStorageService fileStorage, ILogger<UploadCon
 
     [HttpPost]
     [RequestSizeLimit(5 * 1024 * 1024)]
-    public async Task<IActionResult> Upload([FromForm] IFormFile file)
+    public async Task<IActionResult> Upload(IFormFile file)
     {
         try
         {
