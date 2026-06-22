@@ -180,11 +180,14 @@ public class AuctionManager : IAuctionManager
             throw new InvalidOperationException("Auction has ended");
         }
 
+        var previousWinningBid = auction.Bids
+            .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
+        if (previousWinningBid?.UserId == userId)
+            throw new InvalidOperationException("You are already the highest bidder on this auction.");
+
         if (!await _walletManager.HasSufficientBalanceAsync(userId, amount))
             throw new InvalidOperationException("Insufficient balance. Please deposit funds to your wallet.");
 
-        var previousWinningBid = auction.Bids
-            .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
         var previousWinnerId = previousWinningBid?.UserId;
         var previousWinnerAmount = previousWinningBid?.Amount;
 

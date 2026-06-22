@@ -84,6 +84,50 @@ public class AuctionConcurrencyTests : IDisposable
     }
 
     [Fact]
+    public async Task PlaceBid_WhenUserIsCurrentWinner_Throws()
+    {
+        var (user, auction) = await SeedData();
+
+        var firstBid = await PlaceBidAsync(auction.Id, user.Id, 150m);
+        Assert.NotNull(firstBid);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PlaceBidAsync(auction.Id, user.Id, 200m));
+
+        Assert.Contains("already the highest bidder", ex.Message);
+
+        var reloaded = await _auctionRepo.GetByIdWithBidsAsync(auction.Id);
+        Assert.Equal(150m, reloaded!.CurrentHighestBid);
+        Assert.Single(reloaded.Bids);
+    }
+
+    [Fact]
+    public async Task PlaceBid_CurrentWinnerCanStillBeOutbid()
+    {
+        var (user, auction) = await SeedData();
+        var user2 = new User
+        {
+            FullName = "User2", Email = "user2c@test.com",
+            PasswordHash = "hash", Phone = "123",
+            Role = UserRole.Customer, IsActive = true,
+            IsEmailVerified = true, CreatedAt = DateTime.UtcNow
+        };
+        _db.Users.Add(user2);
+        await _db.SaveChangesAsync();
+
+        await PlaceBidAsync(auction.Id, user.Id, 150m);
+
+        var bid = await PlaceBidAsync(auction.Id, user2.Id, 200m);
+        Assert.NotNull(bid);
+
+        var reloaded = await _auctionRepo.GetByIdWithBidsAsync(auction.Id);
+        Assert.Equal(200m, reloaded!.CurrentHighestBid);
+        Assert.Equal(2, reloaded.Bids.Count);
+        Assert.Single(reloaded.Bids, b => b.BidStatus == BidStatus.Winning);
+        Assert.Single(reloaded.Bids, b => b.BidStatus == BidStatus.Valid);
+    }
+
+    [Fact]
     public async Task EndAuction_WithWinningBid_SetsWinnerAndSold()
     {
         var (_, auction) = await SeedData();
@@ -187,6 +231,11 @@ public class AuctionConcurrencyTests : IDisposable
             throw new InvalidOperationException("Auction has ended");
         if (amount < auction.CurrentHighestBid + auction.BidIncrement)
             throw new InvalidOperationException($"Bid must be at least {auction.CurrentHighestBid + auction.BidIncrement:C}");
+
+        var previousWinningBid = auction.Bids
+            .FirstOrDefault(b => b.BidStatus == BidStatus.Winning);
+        if (previousWinningBid?.UserId == userId)
+            throw new InvalidOperationException("You are already the highest bidder on this auction.");
 
         foreach (var prevBid in auction.Bids.Where(b => b.BidStatus == BidStatus.Winning))
             prevBid.BidStatus = BidStatus.Valid;
