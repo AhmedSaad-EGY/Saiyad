@@ -51,6 +51,59 @@ public class WalletManagerTests
         new(_walletRepoMock.Object, _systemWalletRepoMock.Object, _unitOfWorkMock.Object, _loggerMock.Object);
 
     // -------------------------------------------------------
+    //  GetTransactionsAsync
+    // -------------------------------------------------------
+
+    [Fact]
+    public async Task GetTransactionsAsync_WhenWalletHasNoTransactions_ReturnsEmptyPage()
+    {
+        var wallet = CreateWallet(UserId);
+        var pagination = new PaginationRequest { Page = 1, PageSize = 20 };
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetTransactionsAsync(wallet.Id, pagination)).ReturnsAsync([]);
+        _walletRepoMock.Setup(r => r.GetTransactionCountAsync(wallet.Id)).ReturnsAsync(0);
+
+        var result = await CreateManager().GetTransactionsAsync(UserId, pagination);
+
+        result.Items.Should().BeEmpty();
+        result.TotalCount.Should().Be(0);
+        result.Page.Should().Be(1);
+        result.PageSize.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task GetTransactionsAsync_WhenStoredTypeIsUnknown_ReturnsControlledUnknownValue()
+    {
+        var wallet = CreateWallet(UserId);
+        var pagination = new PaginationRequest { Page = 1, PageSize = 20 };
+        var transaction = new WalletTransaction
+        {
+            Id = 77,
+            WalletId = wallet.Id,
+            Amount = 10m,
+            Type = TransactionType.Unknown,
+            ReferenceType = "Legacy",
+            BalanceSnapshot = 100m,
+            CreatedAt = Now
+        };
+        _walletRepoMock.Setup(r => r.GetByUserIdAsync(UserId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetTransactionsAsync(wallet.Id, pagination)).ReturnsAsync([transaction]);
+        _walletRepoMock.Setup(r => r.GetTransactionCountAsync(wallet.Id)).ReturnsAsync(1);
+
+        var result = await CreateManager().GetTransactionsAsync(UserId, pagination);
+
+        result.Items.Should().ContainSingle().Which.Type.Should().Be(nameof(TransactionType.Unknown));
+        _loggerMock.Verify(
+            logger => logger.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("77")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------
     //  GetWalletAsync
     // -------------------------------------------------------
 

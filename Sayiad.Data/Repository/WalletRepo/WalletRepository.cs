@@ -14,7 +14,6 @@ public class WalletRepository : IWalletRepository
     public async Task<Wallet?> GetByUserIdAsync(int userId)
     {
         return await _db.Set<Wallet>()
-            .Include(w => w.Transactions)
             .FirstOrDefaultAsync(w => w.UserId == userId);
     }
 

@@ -61,8 +61,12 @@ public sealed class TransactionTypeValueConverter : ValueConverter<TransactionTy
 
     private static TransactionType ParseStoredValue(string value)
     {
-        return value == "Hold"
-            ? TransactionType.HoldDeduction
-            : Enum.Parse<TransactionType>(value);
+        var normalized = value?.Trim();
+        if (string.Equals(normalized, "Hold", StringComparison.OrdinalIgnoreCase))
+            return TransactionType.HoldDeduction;
+
+        return Enum.TryParse<TransactionType>(normalized, ignoreCase: true, out var parsed)
+            ? parsed
+            : TransactionType.Unknown;
     }
 }

@@ -681,6 +681,18 @@ public class WalletManager : IWalletManager
         var items = await _walletRepo.GetTransactionsAsync(wallet.Id, pagination);
         var totalCount = await _walletRepo.GetTransactionCountAsync(wallet.Id);
 
+        var unknownTransactionIds = items
+            .Where(t => t.Type == TransactionType.Unknown)
+            .Select(t => t.Id)
+            .ToArray();
+        if (unknownTransactionIds.Length > 0)
+        {
+            _logger.LogWarning(
+                "Wallet {WalletId} contains unsupported stored transaction types for transaction IDs {TransactionIds}",
+                wallet.Id,
+                unknownTransactionIds);
+        }
+
         return new WalletTransactionsResponse(
             items.Select(t => new WalletTransactionResponse(
                 t.Id, t.Amount, t.Type.ToString(), t.ReferenceType, t.ReferenceId,

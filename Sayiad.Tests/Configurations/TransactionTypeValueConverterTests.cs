@@ -15,6 +15,16 @@ public class TransactionTypeValueConverterTests
         result.Should().Be(TransactionType.HoldDeduction);
     }
 
+    [Theory]
+    [InlineData(" hold ")]
+    [InlineData("HOLD")]
+    public void ConvertFromProvider_WhenLegacyHoldHasDifferentCasingOrWhitespace_ReturnsHoldDeduction(string value)
+    {
+        var result = _converter.ConvertFromProviderExpression.Compile()(value);
+
+        result.Should().Be(TransactionType.HoldDeduction);
+    }
+
     [Fact]
     public void ConvertFromProvider_WhenValueIsHoldDeduction_ReturnsHoldDeduction()
     {
@@ -29,5 +39,13 @@ public class TransactionTypeValueConverterTests
         var result = _converter.ConvertToProviderExpression.Compile()(TransactionType.HoldDeduction);
 
         result.Should().Be("HoldDeduction");
+    }
+
+    [Fact]
+    public void ConvertFromProvider_WhenValueIsUnsupported_ReturnsUnknown()
+    {
+        var result = _converter.ConvertFromProviderExpression.Compile()("LegacyUnexpectedType");
+
+        result.Should().Be(TransactionType.Unknown);
     }
 }

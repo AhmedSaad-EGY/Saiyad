@@ -2,6 +2,7 @@ namespace Sayiad.Data.Models;
 
 public enum TransactionType
 {
+    Unknown,
     Deposit,
     Withdrawal,
     HoldDeduction,
